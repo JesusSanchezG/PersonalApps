@@ -143,11 +143,11 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* URL Input */}
         <div>
-          <label className="block text-xs font-semibold text-[#0a192f] uppercase tracking-wider mb-1.5">
+          <label className="block text-xs font-semibold text-fg uppercase tracking-wider mb-1.5">
             Enlace de YouTube
           </label>
           <div className="relative flex items-center">
-            <div className="absolute left-3 text-[#736d5a] pointer-events-none flex items-center justify-center">
+            <div className="absolute left-3 text-fg-muted pointer-events-none flex items-center justify-center">
               <svg className="w-5 h-5 text-red-600 fill-current" viewBox="0 0 24 24">
                 <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
               </svg>
@@ -157,14 +157,14 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://www.youtube.com/playlist?list=... o video"
-              className="w-full pl-10 pr-20 py-2.5 rounded-xl bg-[#eeede6] border border-[#dedcd3] focus:border-[#0a192f] focus:ring-1 focus:ring-[#0a192f] text-sm text-[#0a192f] placeholder-[#938c75] transition-all outline-none"
+              className="w-full pl-10 pr-20 py-2.5 rounded-xl bg-surface border border-line focus:border-fg focus:ring-1 focus:ring-fg text-sm text-fg placeholder-fg-muted transition-all outline-none"
               autoFocus
               required
             />
             <button
               type="button"
               onClick={handlePasteFromClipboard}
-              className="absolute right-2 px-2.5 py-1 text-xs font-medium bg-[#e2e0d5] hover:bg-[#dedcd3] text-[#0a192f] rounded-lg transition-colors"
+              className="absolute right-2 px-2.5 py-1 text-xs font-medium bg-surface-2 hover:bg-line text-fg rounded-lg transition-colors"
             >
               Pegar
             </button>
@@ -173,7 +173,7 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
 
         {/* Loading Preview */}
         {isLoadingPreview && (
-          <div className="flex items-center gap-2 text-xs text-[#736d5a] py-2">
+          <div className="flex items-center gap-2 text-xs text-fg-muted py-2">
             <Loader2 className="w-4 h-4 animate-spin text-sky-700" />
             <span>Extrayendo información de YouTube...</span>
           </div>
@@ -181,27 +181,27 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
 
         {/* Live Preview Card */}
         {preview && !isLoadingPreview && (
-          <div className="rounded-xl bg-[#eeede6] border border-[#dedcd3] p-3 flex gap-3 items-center animate-in fade-in duration-200">
+          <div className="rounded-xl bg-surface border border-line p-3 flex gap-3 items-center animate-in fade-in duration-200">
             <img
               src={preview.thumbnailUrl}
               alt={preview.title}
-              className="w-20 h-14 object-cover rounded-lg bg-[#0a192f] shrink-0"
+              className="w-20 h-14 object-cover rounded-lg bg-btn shrink-0"
             />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5 mb-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-[#0a192f] text-white">
+                <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-btn text-white">
                   {preview.type === 'playlist' ? 'Playlist' : 'Video'}
                 </span>
                 {preview.videoCount !== undefined && (
-                  <span className="text-xs text-[#736d5a]">
+                  <span className="text-xs text-fg-muted">
                     {preview.videoCount} {preview.videoCount === 1 ? 'lección' : 'lecciones'}
                   </span>
                 )}
               </div>
-              <h4 className="text-xs font-semibold text-[#0a192f] line-clamp-1">
+              <h4 className="text-xs font-semibold text-fg line-clamp-1">
                 {preview.title}
               </h4>
-              <p className="text-[11px] text-[#736d5a] line-clamp-1">
+              <p className="text-[11px] text-fg-muted line-clamp-1">
                 {preview.channelTitle}
               </p>
             </div>
@@ -210,8 +210,8 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
 
         {/* Custom Title Input */}
         <div>
-          <label className="block text-xs font-semibold text-[#0a192f] uppercase tracking-wider mb-1.5">
-            Título del Curso <span className="text-[#736d5a] font-normal lowercase">(opcional)</span>
+          <label className="block text-xs font-semibold text-fg uppercase tracking-wider mb-1.5">
+            Título del Curso <span className="text-fg-muted font-normal lowercase">(opcional)</span>
           </label>
           <input
             type="text"
@@ -221,7 +221,7 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
               setCustomTitle(e.target.value);
             }}
             placeholder="Puedes personalizar el título del curso"
-            className="w-full px-3.5 py-2 rounded-xl bg-[#eeede6] border border-[#dedcd3] focus:border-[#0a192f] focus:ring-1 focus:ring-[#0a192f] text-sm text-[#0a192f] placeholder-[#938c75] transition-all outline-none"
+            className="w-full px-3.5 py-2 rounded-xl bg-surface border border-line focus:border-fg focus:ring-1 focus:ring-fg text-sm text-fg placeholder-fg-muted transition-all outline-none"
           />
         </div>
 
@@ -234,12 +234,12 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
         )}
 
         {/* Info Box */}
-        <div className="rounded-xl bg-[#e5e4de]/60 border border-[#dedcd3] p-3 text-[11px] text-[#555043] space-y-1">
-          <p className="font-semibold text-[#0a192f] flex items-center gap-1">
+        <div className="rounded-xl bg-surface-2/60 border border-line p-3 text-[11px] text-fg-soft space-y-1">
+          <p className="font-semibold text-fg flex items-center gap-1">
             <Layers className="w-3.5 h-3.5 text-sky-800" />
             Formatos soportados:
           </p>
-          <ul className="list-disc list-inside space-y-0.5 pl-1 text-[#736d5a]">
+          <ul className="list-disc list-inside space-y-0.5 pl-1 text-fg-muted">
             <li>Playlists completas de cursos</li>
             <li>Videos largos individuales (3-10 horas)</li>
             <li>Enlaces cortos (youtu.be)</li>
@@ -247,19 +247,19 @@ export const AddCourseModal: React.FC<AddCourseModalProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#dedcd3]">
+        <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-line">
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2 rounded-xl text-xs font-medium text-[#555043] hover:text-[#0a192f] hover:bg-[#e2e0d5] transition-colors"
+            className="px-4 py-2 rounded-xl text-xs font-medium text-fg-soft hover:text-fg hover:bg-surface-2 transition-colors"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={isSubmitting || !url.trim()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0a192f] hover:bg-[#132b50] text-white text-xs font-semibold shadow-sm active:scale-98 transition-all disabled:opacity-50 disabled:pointer-events-none"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-btn hover:bg-btn-hover text-white text-xs font-semibold shadow-sm active:scale-98 transition-all disabled:opacity-50 disabled:pointer-events-none"
           >
             {isSubmitting ? (
               <>

@@ -52,7 +52,7 @@ export const AddLessonModal: React.FC<AddLessonModalProps> = ({
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-[#0a192f] uppercase tracking-wider mb-1">
+          <label className="block text-xs font-semibold text-fg uppercase tracking-wider mb-1">
             URL del Video de YouTube
           </label>
           <div className="relative">
@@ -66,7 +66,7 @@ export const AddLessonModal: React.FC<AddLessonModalProps> = ({
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://www.youtube.com/watch?v=..."
-              className="w-full pl-9 pr-3 py-2 rounded-xl bg-[#eeede6] border border-[#dedcd3] focus:border-[#0a192f] text-xs text-[#0a192f] outline-none"
+              className="w-full pl-9 pr-3 py-2 rounded-xl bg-surface border border-line focus:border-fg text-xs text-fg outline-none"
               autoFocus
               required
             />
@@ -74,7 +74,7 @@ export const AddLessonModal: React.FC<AddLessonModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-[#0a192f] uppercase tracking-wider mb-1">
+          <label className="block text-xs font-semibold text-fg uppercase tracking-wider mb-1">
             Título de la lección (opcional)
           </label>
           <input
@@ -82,7 +82,7 @@ export const AddLessonModal: React.FC<AddLessonModalProps> = ({
             value={customTitle}
             onChange={(e) => setCustomTitle(e.target.value)}
             placeholder="Ej: Clase 2: Hooks avanzados"
-            className="w-full px-3 py-2 rounded-xl bg-[#eeede6] border border-[#dedcd3] focus:border-[#0a192f] text-xs text-[#0a192f] outline-none"
+            className="w-full px-3 py-2 rounded-xl bg-surface border border-line focus:border-fg text-xs text-fg outline-none"
           />
         </div>
 
@@ -93,18 +93,18 @@ export const AddLessonModal: React.FC<AddLessonModalProps> = ({
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#dedcd3]">
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
           <button
             type="button"
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#555043] hover:bg-[#e2e0d5]"
+            className="px-3 py-1.5 rounded-lg text-xs font-medium text-fg-soft hover:bg-surface-2"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={isSubmitting || !url.trim()}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#0a192f] hover:bg-[#132b50] text-white text-xs font-semibold disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-btn hover:bg-btn-hover text-white text-xs font-semibold disabled:opacity-50"
           >
             {isSubmitting ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />

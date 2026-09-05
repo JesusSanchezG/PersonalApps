@@ -1,7 +1,22 @@
 -- ============================================================
 --  CursosTube - Esquema Supabase
---  Ejecuta este script en: Supabase Dashboard -> SQL Editor
+--  Ejecuta este archivo en: Supabase Dashboard -> SQL Editor
+--
+--  Compatible con el proyecto kaulvejowumizovgdhbs.supabase.co.
+--  Si ya existía un esquema anterior (por ejemplo el de
+--  "CourseHub": courses/videos/video_progress), se elimina y
+--  se crea el de CursosTube. Idempotente: se puede re-ejecutar.
 -- ============================================================
+
+-- ------------------------------------------------------------
+-- 0) Limpiar esquemas previos (cualquier versión) en orden
+--    por dependencias. Sin pérdida de datos relevantes.
+-- ------------------------------------------------------------
+drop table if exists public.course_notes   cascade;
+drop table if exists public.user_progress  cascade;
+drop table if exists public.video_progress cascade;
+drop table if exists public.videos         cascade;
+drop table if exists public.courses        cascade;
 
 -- ------------------------------------------------------------
 -- 1. Tabla de cursos (los videos se guardan como JSONB)

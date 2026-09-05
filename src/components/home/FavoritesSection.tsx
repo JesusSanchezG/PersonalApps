@@ -29,13 +29,13 @@ export const FavoritesSection: React.FC<FavoritesSectionProps> = ({
           <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
         </div>
         <div>
-          <h2 className="text-lg sm:text-xl font-bold text-[#0a192f] tracking-tight flex items-center gap-2">
+          <h2 className="text-lg sm:text-xl font-bold text-fg tracking-tight flex items-center gap-2">
             Cursos Favoritos
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
               {favoriteCourses.length}
             </span>
           </h2>
-          <p className="text-xs text-[#736d5a]">Tus cursos destacados para acceso rápido</p>
+          <p className="text-xs text-fg-muted">Tus cursos destacados para acceso rápido</p>
         </div>
       </div>
 

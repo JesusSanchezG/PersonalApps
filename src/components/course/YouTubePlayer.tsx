@@ -67,15 +67,37 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
       }
     };
 
+    // Antes de reproducir, asegura que la posición de reanudación no quede
+    // a menos de 3s del final: una lección ya completada reaparece en 0 para
+    // que no termine al instante y salte sola a la siguiente clase.
+    const clampStartToSafe = (player: any, initial: number) => {
+      if (!initial || typeof player.getDuration !== 'function') return;
+      let tries = 0;
+      const id = window.setInterval(() => {
+        tries += 1;
+        try {
+          const duration = player.getDuration();
+          if (duration > 0) {
+            window.clearInterval(id);
+            if (initial >= duration - 3) {
+              try {
+                player.seekTo(0, true);
+              } catch {
+                // ignore seek errors
+              }
+            }
+            return;
+          }
+        } catch {
+          // player not ready yet
+        }
+        if (tries > 8) window.clearInterval(id);
+      }, 300);
+    };
+
     const onReady = (event: any) => {
       setIsLoading(false);
-      if (initialTimeSeconds > 5) {
-        try {
-          event.target.seekTo(initialTimeSeconds, true);
-        } catch (e) {
-          console.warn('Seek error:', e);
-        }
-      }
+      clampStartToSafe(event.target, initialTimeSeconds);
       if (autoPlay) {
         try {
           event.target.playVideo();
@@ -95,6 +117,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
           videoId,
           startSeconds: initialTimeSeconds || 0,
         });
+        clampStartToSafe(playerRef.current, initialTimeSeconds);
         setIsLoading(false);
         return;
       } catch (e) {
@@ -260,7 +283,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
   }, [onTimeUpdate]);
 
   return (
-    <div className="relative w-full rounded-2xl bg-[#070e1b] shadow-2xl border border-[#132b50]">
+    <div className="relative w-full rounded-2xl bg-navy-950 shadow-2xl border border-navy-800">
       {/* Aspect ratio via padding-top hack (16:9). Avoids CSS aspect-ratio +
           overflow:hidden which breaks fullscreen on iOS Safari / Android Chrome.
           The iframe (fullscreen element) lives inside this non-clipped box. */}
@@ -270,7 +293,7 @@ export const YouTubePlayer: React.FC<YouTubePlayerProps> = ({
 
         {/* Loading overlay */}
         {isLoading && (
-          <div className="absolute inset-0 bg-[#0a192f] flex flex-col items-center justify-center text-white pointer-events-none transition-opacity rounded-2xl">
+          <div className="absolute inset-0 bg-btn flex flex-col items-center justify-center text-white pointer-events-none transition-opacity rounded-2xl">
             <Loader2 className="w-8 h-8 animate-spin text-sky-400 mb-2" />
             <span className="text-xs text-slate-300 font-medium">Cargando reproductor de YouTube...</span>
           </div>

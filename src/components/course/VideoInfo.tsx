@@ -34,13 +34,13 @@ export const VideoInfo: React.FC<VideoInfoProps> = ({
   onSelectNext,
 }) => {
   return (
-    <div className="rounded-2xl bg-[#eeede6] border border-[#dedcd3] p-4 sm:p-5 shadow-sm transition-all">
+    <div className="rounded-2xl bg-surface border border-line p-4 sm:p-5 shadow-sm transition-all">
       {/* Top row: Badges & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         {/* Left: Lesson Index & Title */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#0a192f] text-white">
+            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-btn text-white">
               Lección {currentIndex + 1} de {totalVideos}
             </span>
 
@@ -50,20 +50,20 @@ export const VideoInfo: React.FC<VideoInfoProps> = ({
                 <span>Completada</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-[#736d5a] bg-[#e2e0d5] px-2 py-0.5 rounded-md">
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-fg-muted bg-surface-2 px-2 py-0.5 rounded-md">
                 <span>En progreso</span>
               </span>
             )}
 
             {channelTitle && (
-              <span className="text-xs text-[#736d5a] flex items-center gap-1 truncate">
-                <User className="w-3 h-3 text-[#736d5a]" />
+              <span className="text-xs text-fg-muted flex items-center gap-1 truncate">
+                <User className="w-3 h-3 text-fg-muted" />
                 {channelTitle}
               </span>
             )}
           </div>
 
-          <h2 className="text-base sm:text-lg font-bold text-[#0a192f] leading-snug">
+          <h2 className="text-base sm:text-lg font-bold text-fg leading-snug">
             {currentVideo.title}
           </h2>
         </div>
@@ -74,7 +74,7 @@ export const VideoInfo: React.FC<VideoInfoProps> = ({
           <button
             onClick={onSelectPrev}
             disabled={!prevVideo}
-            className="p-2 rounded-xl bg-[#e2e0d5] hover:bg-[#dedcd3] disabled:opacity-30 disabled:pointer-events-none text-[#0a192f] transition-colors"
+            className="p-2 rounded-xl bg-surface-2 hover:bg-line disabled:opacity-30 disabled:pointer-events-none text-fg transition-colors"
             title={prevVideo ? `Anterior: ${prevVideo.title}` : 'No hay lección anterior'}
           >
             <ChevronLeft className="w-4 h-4" />
@@ -86,7 +86,7 @@ export const VideoInfo: React.FC<VideoInfoProps> = ({
             className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all shadow-xs active:scale-98 ${
               isWatched
                 ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                : 'bg-[#0a192f] text-white hover:bg-[#132b50]'
+                : 'bg-btn text-white hover:bg-btn-hover'
             }`}
           >
             <CheckCircle2
@@ -99,7 +99,7 @@ export const VideoInfo: React.FC<VideoInfoProps> = ({
           <button
             onClick={onSelectNext}
             disabled={!nextVideo}
-            className="p-2 rounded-xl bg-[#e2e0d5] hover:bg-[#dedcd3] disabled:opacity-30 disabled:pointer-events-none text-[#0a192f] transition-colors"
+            className="p-2 rounded-xl bg-surface-2 hover:bg-line disabled:opacity-30 disabled:pointer-events-none text-fg transition-colors"
             title={nextVideo ? `Siguiente: ${nextVideo.title}` : 'No hay siguiente lección'}
           >
             <ChevronRight className="w-4 h-4" />
@@ -108,7 +108,7 @@ export const VideoInfo: React.FC<VideoInfoProps> = ({
       </div>
 
       {/* YouTube Direct Link */}
-      <div className="mt-3 pt-3 border-t border-[#dedcd3]/70 flex items-center justify-between text-xs text-[#736d5a]">
+      <div className="mt-3 pt-3 border-t border-line/70 flex items-center justify-between text-xs text-fg-muted">
         <div className="flex items-center gap-2">
           <span className="text-[11px]">Progreso guardado automáticamente al finalizar</span>
         </div>

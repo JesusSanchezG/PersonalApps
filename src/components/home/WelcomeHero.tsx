@@ -8,7 +8,7 @@ interface WelcomeHeroProps {
 
 export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onAddCourseClick, hasCourses }) => {
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0a192f] via-[#0d213f] to-[#132b50] text-white p-6 sm:p-10 shadow-lg border border-[#1d3e6e] mb-10">
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-navy-900 via-navy-850 to-navy-800 text-white p-6 sm:p-10 shadow-lg border border-navy-700 mb-10">
       {/* Subtle decorative background glow */}
       <div className="absolute -top-24 -right-24 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -52,9 +52,9 @@ export const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onAddCourseClick, hasC
         {!hasCourses && (
           <button
             onClick={onAddCourseClick}
-            className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-white text-[#0a192f] font-semibold text-sm hover:bg-sky-50 transition-all shadow-md active:scale-95"
+            className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-white text-fg font-semibold text-sm hover:bg-sky-50 transition-all shadow-md active:scale-95"
           >
-            <Plus className="w-4 h-4 text-[#0a192f]" />
+            <Plus className="w-4 h-4 text-fg" />
             <span>Añadir mi primer curso</span>
           </button>
         )}

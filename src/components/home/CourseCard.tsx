@@ -32,10 +32,10 @@ export const CourseCard: React.FC<CourseCardProps> = ({
   return (
     <div
       onClick={() => onSelect(course.id)}
-      className="group relative flex flex-col rounded-2xl bg-[#eeede6] border border-[#dedcd3] hover:border-[#1d3e6e]/40 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden"
+      className="group relative flex flex-col rounded-2xl bg-surface border border-line hover:border-navy-700/40 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden"
     >
       {/* Thumbnail Container */}
-      <div className="relative aspect-video w-full bg-[#0a192f] overflow-hidden">
+      <div className="relative aspect-video w-full bg-btn overflow-hidden">
         <img
           src={course.thumbnailUrl}
           alt={course.title}
@@ -44,11 +44,11 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         />
 
         {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0a192f]/80 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-navy-900/80 via-transparent to-transparent pointer-events-none" />
 
         {/* Play Icon Center Hover */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-[#0a192f]/30">
-          <div className="w-12 h-12 rounded-full bg-[#0a192f] text-white flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-btn/30">
+          <div className="w-12 h-12 rounded-full bg-btn text-white flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-transform">
             <Play className="w-5 h-5 text-sky-300 ml-0.5 fill-sky-300" />
           </div>
         </div>
@@ -56,7 +56,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
         {/* Top Badges & Favorite Star */}
         <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between z-10 pointer-events-auto">
           {/* Badge: Playlist vs Video */}
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#0a192f]/80 backdrop-blur-md text-white text-[11px] font-medium border border-white/10">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-btn/80 backdrop-blur-md text-white text-[11px] font-medium border border-white/10">
             <Video className="w-3 h-3 text-sky-300" />
             <span>{course.type === 'playlist' ? `${totalVideos} videos` : 'Video completo'}</span>
           </span>
@@ -68,18 +68,18 @@ export const CourseCard: React.FC<CourseCardProps> = ({
               title={course.isFavorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
               className={`p-1.5 rounded-full backdrop-blur-md transition-all ${
                 course.isFavorite
-                  ? 'bg-amber-400 text-[#0a192f] shadow-sm'
-                  : 'bg-[#0a192f]/60 text-white/80 hover:text-white hover:bg-[#0a192f]/90'
+                  ? 'bg-amber-400 text-fg shadow-sm'
+                  : 'bg-navy-900/60 text-white/80 hover:text-white hover:bg-navy-900/90'
               }`}
             >
-              <Star className={`w-4 h-4 ${course.isFavorite ? 'fill-[#0a192f]' : ''}`} />
+              <Star className={`w-4 h-4 ${course.isFavorite ? 'fill-fg' : ''}`} />
             </button>
 
             {/* Menu trigger */}
             <div className="relative">
               <button
                 onClick={() => setShowMenu(!showMenu)}
-                className="p-1.5 rounded-full bg-[#0a192f]/60 text-white/80 hover:text-white hover:bg-[#0a192f]/90 backdrop-blur-md transition-colors"
+                className="p-1.5 rounded-full bg-navy-900/60 text-white/80 hover:text-white hover:bg-navy-900/90 backdrop-blur-md transition-colors"
                 title="Opciones"
               >
                 <MoreVertical className="w-4 h-4" />
@@ -87,7 +87,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
 
               {showMenu && (
                 <div
-                  className="absolute right-0 mt-1 w-36 rounded-xl bg-[#f5f5f0] border border-[#dedcd3] shadow-xl py-1 z-20"
+                  className="absolute right-0 mt-1 w-36 rounded-xl bg-page border border-line shadow-xl py-1 z-20"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <button
@@ -119,22 +119,22 @@ export const CourseCard: React.FC<CourseCardProps> = ({
       <div className="p-4 flex-1 flex flex-col justify-between">
         <div>
           <h3
-            className="font-semibold text-sm text-[#0a192f] line-clamp-2 mb-1 group-hover:text-sky-900 transition-colors leading-snug"
+            className="font-semibold text-sm text-fg line-clamp-2 mb-1 group-hover:text-sky-900 transition-colors leading-snug"
             title={course.title}
           >
             {course.title}
           </h3>
 
           {course.channelTitle && (
-            <p className="text-xs text-[#736d5a] line-clamp-1 mb-3">
+            <p className="text-xs text-fg-muted line-clamp-1 mb-3">
               {course.channelTitle}
             </p>
           )}
         </div>
 
         {/* Progress Bar & Footer */}
-        <div className="pt-2 border-t border-[#dedcd3]/70 space-y-2">
-          <div className="flex items-center justify-between text-[11px] font-medium text-[#555043]">
+        <div className="pt-2 border-t border-line/70 space-y-2">
+          <div className="flex items-center justify-between text-[11px] font-medium text-fg-soft">
             <span>{completedVideos} de {totalVideos} videos vistos</span>
             <span className={isCompleted ? 'text-emerald-700 font-bold' : ''}>
               {progressPercent}%
@@ -142,10 +142,10 @@ export const CourseCard: React.FC<CourseCardProps> = ({
           </div>
 
           {/* Progress Bar */}
-          <div className="w-full h-1.5 bg-[#dedcd3] rounded-full overflow-hidden">
+          <div className="w-full h-1.5 bg-line rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-500 rounded-full ${
-                isCompleted ? 'bg-emerald-500' : 'bg-[#0a192f]'
+                isCompleted ? 'bg-emerald-500' : 'bg-btn'
               }`}
               style={{ width: `${progressPercent}%` }}
             />
@@ -153,7 +153,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
 
           {/* Action Link text */}
           <div className="flex items-center justify-between pt-1 text-xs">
-            <span className="text-[#736d5a] flex items-center gap-1.5 text-[11px]">
+            <span className="text-fg-muted flex items-center gap-1.5 text-[11px]">
               <Clock className="w-3 h-3" />
               {hasStarted ? 'En progreso' : 'Sin iniciar'}
               {isSignedIn && (
@@ -162,7 +162,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
                 </span>
               )}
             </span>
-            <span className="font-semibold text-[#0a192f] group-hover:text-sky-800 flex items-center gap-1">
+            <span className="font-semibold text-fg group-hover:text-sky-800 flex items-center gap-1">
               {hasStarted ? 'Continuar' : 'Comenzar'} &rarr;
             </span>
           </div>
@@ -172,7 +172,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
       {/* Delete Confirmation Overlay */}
       {showDeleteConfirm && (
         <div
-          className="absolute inset-0 bg-[#0a192f]/90 backdrop-blur-sm z-30 p-4 flex flex-col items-center justify-center text-center text-white animate-in fade-in duration-150"
+          className="absolute inset-0 bg-navy-900/90 backdrop-blur-sm z-30 p-4 flex flex-col items-center justify-center text-center text-white animate-in fade-in duration-150"
           onClick={(e) => e.stopPropagation()}
         >
           <Trash2 className="w-8 h-8 text-red-400 mb-2" />

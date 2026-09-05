@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, AlertCircle, Check, Mail, Lock, User as UserIcon, Cloud } from 'lucide-react';
+import { Loader2, AlertCircle, Cloud } from 'lucide-react';
 import { Modal } from '../common/Modal';
 import { useAuth } from '../../context/AuthContext';
 
@@ -8,185 +8,100 @@ interface AuthModalProps {
   onClose: () => void;
 }
 
-export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { signIn, signUp } = useAuth();
+const GoogleIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+    <path
+      fill="#4285F4"
+      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H2.18A10.96 10.96 0 0 0 1 12c0 1.77.42 3.45 1.18 4.95l3.66-2.85z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+    />
+  </svg>
+);
 
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
+  const { signInWithGoogle } = useAuth();
+
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
       setError(null);
-      setInfo(null);
       setIsSubmitting(false);
     }
   }, [isOpen]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogle = async () => {
     setError(null);
-    setInfo(null);
-
-    if (!email.trim() || !password) {
-      setError('Completa el correo y la contraseña.');
-      return;
-    }
-    if (mode === 'register' && password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.');
-      return;
-    }
-
     setIsSubmitting(true);
-    try {
-      const result =
-        mode === 'login'
-          ? await signIn(email.trim(), password)
-          : await signUp(email.trim(), password, name);
-
-      if (result.error) {
-        setError(result.error);
-        return;
-      }
-
-      if (result.needsEmailConfirmation) {
-        setInfo('Cuenta creada. Revisa tu correo para confirmarla y luego inicia sesión.');
-        setMode('login');
-      } else {
-        onClose();
-      }
-    } finally {
+    const result = await signInWithGoogle();
+    if (result.error) {
+      setError(result.error);
       setIsSubmitting(false);
     }
+    // En éxito el navegador redirige o cierra el popup; no hacemos nada más.
   };
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}
+      title="Iniciar sesión"
       subtitle="Sincroniza tus cursos, progreso y apuntes entre dispositivos"
       maxWidth="sm"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Mode Tabs */}
-        <div className="inline-flex rounded-xl bg-[#dedcd3] p-0.5 text-xs font-medium w-full">
-          <button
-            type="button"
-            onClick={() => {
-              setMode('login');
-              setError(null);
-            }}
-            className={`flex-1 px-3 py-2 rounded-lg transition-colors ${
-              mode === 'login'
-                ? 'bg-[#0a192f] text-white shadow-xs'
-                : 'text-[#555043] hover:text-[#0a192f]'
-            }`}
-          >
-            Iniciar sesión
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode('register');
-              setError(null);
-            }}
-            className={`flex-1 px-3 py-2 rounded-lg transition-colors ${
-              mode === 'register'
-                ? 'bg-[#0a192f] text-white shadow-xs'
-                : 'text-[#555043] hover:text-[#0a192f]'
-            }`}
-          >
-            Crear cuenta
-          </button>
-        </div>
+      <div className="space-y-4">
+        <button
+          type="button"
+          onClick={handleGoogle}
+          disabled={isSubmitting}
+          className="flex w-full items-center justify-center gap-3 rounded-xl border border-line bg-white px-5 py-3 text-sm font-semibold text-fg shadow-sm transition-all hover:bg-card hover:border-line-strong disabled:opacity-60 active:scale-[0.99]"
+        >
+          {isSubmitting ? (
+            <Loader2 className="h-5 w-5 animate-spin text-sky-700" />
+          ) : (
+            <GoogleIcon />
+          )}
+          {isSubmitting ? 'Redirigiendo a Google...' : 'Continuar con Google'}
+        </button>
 
-        {/* Name (only register) */}
-        {mode === 'register' && (
-          <div className="relative">
-            <UserIcon className="w-4 h-4 text-[#736d5a] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Tu nombre (opcional)"
-              className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#eeede6] border border-[#dedcd3] focus:border-[#0a192f] text-sm text-[#0a192f] placeholder-[#938c75] outline-none transition-all"
-            />
-          </div>
-        )}
+        <p className="text-center text-[11px] leading-relaxed text-fg-muted">
+          Al continuar aceptas iniciar sesión con tu cuenta de Google. Tus cursos,
+          progreso y notas se guardarán en la nube.
+        </p>
 
-        {/* Email */}
-        <div className="relative">
-          <Mail className="w-4 h-4 text-[#736d5a] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="correo@ejemplo.com"
-            autoComplete="email"
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#eeede6] border border-[#dedcd3] focus:border-[#0a192f] text-sm text-[#0a192f] placeholder-[#938c75] outline-none transition-all"
-            required
-          />
-        </div>
-
-        {/* Password */}
-        <div className="relative">
-          <Lock className="w-4 h-4 text-[#736d5a] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={mode === 'register' ? 'Contraseña (mínimo 6 caracteres)' : 'Contraseña'}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#eeede6] border border-[#dedcd3] focus:border-[#0a192f] text-sm text-[#0a192f] placeholder-[#938c75] outline-none transition-all"
-            required
-          />
-        </div>
-
-        {/* Error / Info messages */}
         {error && (
-          <div className="p-2.5 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 flex items-start gap-2 animate-in fade-in">
-            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-800 animate-in fade-in">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
             <span>{error}</span>
           </div>
         )}
 
-        {info && (
-          <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2 animate-in fade-in">
-            <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-            <span>{info}</span>
-          </div>
-        )}
-
-        {/* Submit */}
-        <div className="flex items-center justify-between gap-2 pt-2 border-t border-[#dedcd3]">
-          <span className="text-[11px] text-[#736d5a] flex items-center gap-1">
-            <Cloud className="w-3 h-3 text-sky-700" />
+        <div className="flex items-center justify-between gap-2 border-t border-line pt-2">
+          <span className="flex items-center gap-1 text-[11px] text-fg-muted">
+            <Cloud className="h-3 w-3 text-sky-700" />
             Supabase &bull; tus datos están protegidos
           </span>
           <button
-            type="submit"
-            disabled={isSubmitting}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0a192f] hover:bg-[#132b50] text-white text-xs font-semibold shadow-sm transition-all disabled:opacity-60"
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-3 py-1.5 text-[11px] font-medium text-fg-soft transition-colors hover:bg-line hover:text-fg"
           >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-sky-300" />
-                <span>Procesando...</span>
-              </>
-            ) : (
-              <>
-                <Check className="w-4 h-4 text-sky-300" />
-                <span>{mode === 'login' ? 'Entrar y sincronizar' : 'Crear cuenta'}</span>
-              </>
-            )}
+            Cancelar
           </button>
         </div>
-      </form>
+      </div>
     </Modal>
   );
 };

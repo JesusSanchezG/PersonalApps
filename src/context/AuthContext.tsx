@@ -11,7 +11,6 @@ import { getSupabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 interface AuthResult {
   error: string | null;
-  needsEmailConfirmation?: boolean;
 }
 
 interface AuthContextType {
@@ -19,8 +18,7 @@ interface AuthContextType {
   session: Session | null;
   isAuthLoading: boolean;
   isSupabaseConfigured: boolean;
-  signIn: (email: string, password: string) => Promise<AuthResult>;
-  signUp: (email: string, password: string, name: string) => Promise<AuthResult>;
+  signInWithGoogle: () => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
@@ -61,50 +59,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const signIn = useCallback(
-    async (email: string, password: string): Promise<AuthResult> => {
-      const client = await getSupabase();
-      if (!client) return { error: 'Supabase no está configurado.' };
-      const { error } = await client.auth.signInWithPassword({ email, password });
-      if (error) {
-        return {
-          error:
-            error.message === 'Invalid login credentials'
-              ? 'Correo o contraseña incorrectos.'
-              : error.message,
-        };
-      }
-      return { error: null };
-    },
-    []
-  );
-
-  const signUp = useCallback(
-    async (email: string, password: string, name: string): Promise<AuthResult> => {
-      const client = await getSupabase();
-      if (!client) return { error: 'Supabase no está configurado.' };
-      const { data, error } = await client.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { display_name: name.trim() || null },
-          emailRedirectTo: window.location.origin,
-        },
-      });
-      if (error) {
-        return { error: error.message };
-      }
-      // Si la confirmación por correo está activada, no habrá sesión inmediata
-      if (data.session) {
-        return { error: null };
-      }
-      return {
-        error: null,
-        needsEmailConfirmation: true,
-      };
-    },
-    []
-  );
+  const signInWithGoogle = useCallback(async (): Promise<AuthResult> => {
+    const client = await getSupabase();
+    if (!client) return { error: 'Supabase no está configurado.' };
+    const { error } = await client.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+      },
+    });
+    if (error) {
+      return { error: error.message };
+    }
+    return { error: null };
+  }, []);
 
   const signOut = useCallback(async () => {
     const client = await getSupabase();
@@ -117,11 +85,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       session,
       isAuthLoading,
       isSupabaseConfigured,
-      signIn,
-      signUp,
+      signInWithGoogle,
       signOut,
     }),
-    [session, isAuthLoading, signIn, signUp, signOut]
+    [session, isAuthLoading, signInWithGoogle, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

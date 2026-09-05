@@ -11,11 +11,11 @@ const CourseView = lazy(() =>
 );
 
 const FullPageSpinner: React.FC = () => (
-  <div className="min-h-screen bg-[#f5f5f0] flex flex-col items-center justify-center gap-3">
-    <div className="w-12 h-12 rounded-2xl bg-[#0a192f] flex items-center justify-center">
+  <div className="min-h-screen bg-page flex flex-col items-center justify-center gap-3">
+    <div className="w-12 h-12 rounded-2xl bg-btn flex items-center justify-center">
       <Loader2 className="w-6 h-6 text-sky-300 animate-spin" />
     </div>
-    <span className="text-xs text-[#736d5a] font-medium">Cargando...</span>
+    <span className="text-xs text-fg-muted font-medium">Cargando...</span>
   </div>
 );
 

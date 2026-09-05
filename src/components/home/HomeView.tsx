@@ -81,7 +81,7 @@ export const HomeView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f5f5f0] text-[#0a192f] flex flex-col font-sans selection:bg-[#0a192f] selection:text-white">
+    <div className="min-h-screen bg-page text-fg flex flex-col font-sans selection:bg-btn selection:text-white">
       {/* Top Navigation */}
       <Navbar
         onOpenAddModal={() => setIsAddModalOpen(true)}
@@ -122,7 +122,7 @@ export const HomeView: React.FC = () => {
             </span>
             <button
               onClick={() => setIsAuthModalOpen(true)}
-              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0a192f] hover:bg-[#132b50] text-white font-semibold transition-colors"
+              className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-btn hover:bg-btn-hover text-white font-semibold transition-colors"
             >
               <LogIn className="w-3 h-3" />
               Iniciar sesión
@@ -182,38 +182,38 @@ export const HomeView: React.FC = () => {
               {/* Header with Search and Filter */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                 <div>
-                  <h2 className="text-xl font-bold text-[#0a192f] tracking-tight flex items-center gap-2">
+                  <h2 className="text-xl font-bold text-fg tracking-tight flex items-center gap-2">
                     <BookOpen className="w-5 h-5 text-sky-800" />
                     <span>Mis Cursos</span>
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#e2e0d5] text-[#555043]">
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-surface-2 text-fg-soft">
                       {courses.length}
                     </span>
                   </h2>
-                  <p className="text-xs text-[#736d5a]">Selecciona un curso para continuar donde lo dejaste</p>
+                  <p className="text-xs text-fg-muted">Selecciona un curso para continuar donde lo dejaste</p>
                 </div>
 
                 {/* Filters and Search Bar */}
                 <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                   {/* Search Input */}
                   <div className="relative flex-1 sm:w-64">
-                    <Search className="w-4 h-4 text-[#736d5a] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Search className="w-4 h-4 text-fg-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Buscar en mis cursos..."
-                      className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-[#eeede6] border border-[#dedcd3] focus:border-[#0a192f] text-xs text-[#0a192f] placeholder-[#938c75] outline-none transition-all"
+                      className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-surface border border-line focus:border-fg text-xs text-fg placeholder-fg-muted outline-none transition-all"
                     />
                   </div>
 
                   {/* Filter Pills */}
-                  <div className="inline-flex rounded-xl bg-[#eeede6] p-0.5 border border-[#dedcd3] text-xs">
+                  <div className="inline-flex rounded-xl bg-surface p-0.5 border border-line text-xs">
                     <button
                       onClick={() => setFilterType('all')}
                       className={`px-3 py-1 rounded-lg font-medium transition-colors ${
                         filterType === 'all'
-                          ? 'bg-[#0a192f] text-white shadow-xs'
-                          : 'text-[#555043] hover:text-[#0a192f]'
+                          ? 'bg-btn text-white shadow-xs'
+                          : 'text-fg-soft hover:text-fg'
                       }`}
                     >
                       Todos
@@ -222,8 +222,8 @@ export const HomeView: React.FC = () => {
                       onClick={() => setFilterType('in-progress')}
                       className={`px-3 py-1 rounded-lg font-medium transition-colors ${
                         filterType === 'in-progress'
-                          ? 'bg-[#0a192f] text-white shadow-xs'
-                          : 'text-[#555043] hover:text-[#0a192f]'
+                          ? 'bg-btn text-white shadow-xs'
+                          : 'text-fg-soft hover:text-fg'
                       }`}
                     >
                       En Curso
@@ -232,8 +232,8 @@ export const HomeView: React.FC = () => {
                       onClick={() => setFilterType('completed')}
                       className={`px-3 py-1 rounded-lg font-medium transition-colors ${
                         filterType === 'completed'
-                          ? 'bg-[#0a192f] text-white shadow-xs'
-                          : 'text-[#555043] hover:text-[#0a192f]'
+                          ? 'bg-btn text-white shadow-xs'
+                          : 'text-fg-soft hover:text-fg'
                       }`}
                     >
                       Completados
@@ -258,8 +258,8 @@ export const HomeView: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="p-8 text-center rounded-2xl bg-[#eeede6] border border-[#dedcd3]">
-                  <p className="text-xs text-[#736d5a]">
+                <div className="p-8 text-center rounded-2xl bg-surface border border-line">
+                  <p className="text-xs text-fg-muted">
                     No se encontraron cursos que coincidan con los filtros de búsqueda.
                   </p>
                 </div>
@@ -304,7 +304,7 @@ export const HomeView: React.FC = () => {
       </Suspense>
 
       {/* Footer */}
-      <footer className="mt-16 border-t border-[#dedcd3] py-6 text-center text-xs text-[#736d5a]">
+      <footer className="mt-16 border-t border-line py-6 text-center text-xs text-fg-muted">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <span>CursosTube &bull; Diseñado para aprender en YouTube sin distracciones</span>
           <span>{isSignedIn ? 'Datos sincronizados en la nube' : 'Almacenamiento 100% privado en tu navegador'}</span>

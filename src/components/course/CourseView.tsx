@@ -38,6 +38,12 @@ export const CourseView: React.FC = () => {
   // autoplay) arranca desde 0 para que no salte sola a la siguiente.
   const [resumeFromCheckpoint, setResumeFromCheckpoint] = useState(true);
   const playerInstanceRef = useRef<any>(null);
+  // Marca la posición de reanudación y su instante para detectar el caso de
+  // una clase que quedó "al filo" del final: si termina a los pocos segundos
+  // de abrir el curso, es una re-visita de una lección ya vista y debe
+  // reiniciarse en 0 en lugar de saltar sola a la siguiente.
+  const initialTimeRef = useRef<number>(0);
+  const resumeStartTsRef = useRef<number>(Date.now());
 
   // Find active video item (values may be empty while course is loading)
   const videos = activeCourse?.videos ?? [];
@@ -55,23 +61,43 @@ export const CourseView: React.FC = () => {
   const currentVideoNotes = currentVideoProg?.notes || '';
   const overallNotes = activeCourseProgress?.overallNotes || '';
 
-  // Initial resume time: solo al entrar al curso y solo si la clase aún no
-  // está completada (si ya fue vista, arranca desde 0 para no saltar sola).
-  const initialTime =
-    resumeFromCheckpoint && !isCurrentWatched
-      ? (currentVideoProg?.lastPositionSeconds || 0)
-      : 0;
+  // Initial resume time: al entrar al curso se retoma la posición guardada,
+  // aunque la clase ya esté marcada como vista (permite re-revisarla donde
+  // quedó). Si la posición guardada está a menos de 3s del final, el
+  // reproductor la recorta a 0 para que una lección terminada no se auto-avance.
+  const initialTime = resumeFromCheckpoint ? (currentVideoProg?.lastPositionSeconds || 0) : 0;
+  initialTimeRef.current = initialTime;
 
   // Shared handler: any manual video selection starts playback from 0
   const handleSelectVideo = useCallback((videoId: string) => {
     setResumeFromCheckpoint(false);
     setAutoPlayNextVideo(null);
+    resumeStartTsRef.current = Date.now();
     setActiveVideo(videoId);
   }, [setActiveVideo]);
 
   // Auto-mark watched & handle autoplay countdown when video ends
   const handleVideoEnded = useCallback(() => {
     if (!courseId || !effectiveVideoId) return;
+
+    // Si el curso se acaba de abrir retomando una posición muy cerca del
+    // final (lección ya vista), el video termina al instante: retrocede al
+    // inicio para revisarla desde 0 y no salte sola a la siguiente clase.
+    if (
+      initialTimeRef.current > 0 &&
+      isCurrentWatched &&
+      Date.now() - resumeStartTsRef.current < 8000
+    ) {
+      if (playerInstanceRef.current && typeof playerInstanceRef.current.seekTo === 'function') {
+        try {
+          playerInstanceRef.current.seekTo(0, true);
+          playerInstanceRef.current.playVideo();
+          return;
+        } catch {
+          // fallback: permisos de autoplay bloqueados
+        }
+      }
+    }
 
     // 1. Mark current video as watched (automatic green dot)
     markVideoWatched(courseId, effectiveVideoId, true);
@@ -139,12 +165,12 @@ export const CourseView: React.FC = () => {
   // Guard AFTER all hooks (Rules of Hooks): no course selected
   if (!activeCourse) {
     return (
-      <div className="min-h-screen bg-[#f5f5f0] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-page flex items-center justify-center p-4">
         <div className="text-center">
-          <p className="text-sm text-[#736d5a] mb-4">No se ha seleccionado ningún curso.</p>
+          <p className="text-sm text-fg-muted mb-4">No se ha seleccionado ningún curso.</p>
           <button
             onClick={() => setActiveCourse(null)}
-            className="px-4 py-2 rounded-xl bg-[#0a192f] text-white text-xs font-semibold"
+            className="px-4 py-2 rounded-xl bg-btn text-white text-xs font-semibold"
           >
             Volver a inicio
           </button>
@@ -154,14 +180,14 @@ export const CourseView: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f0] text-[#0a192f] flex flex-col font-sans selection:bg-[#0a192f] selection:text-white">
+    <div className="min-h-screen bg-page text-fg flex flex-col font-sans selection:bg-btn selection:text-white">
       {/* 1. Header (Full Width Top Bar) */}
-      <header className="sticky top-0 z-30 bg-[#f5f5f0]/95 backdrop-blur-md border-b border-[#dedcd3] px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-30 bg-page/95 backdrop-blur-md border-b border-line px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4">
         {/* Left: Back to Home & Course Title */}
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={() => setActiveCourse(null)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#eeede6] hover:bg-[#e2e0d5] text-xs font-semibold text-[#0a192f] transition-colors shrink-0"
+            className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-surface hover:bg-surface-2 text-xs font-semibold text-fg transition-colors shrink-0"
             title="Volver a la lista de cursos"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -169,10 +195,10 @@ export const CourseView: React.FC = () => {
           </button>
 
           <div className="min-w-0">
-            <h1 className="text-xs sm:text-sm font-bold text-[#0a192f] truncate">
+            <h1 className="text-xs sm:text-sm font-bold text-fg truncate">
               {activeCourse.title}
             </h1>
-            <p className="text-[11px] text-[#736d5a] truncate hidden sm:block">
+            <p className="text-[11px] text-fg-muted truncate hidden sm:block">
               {activeCourse.channelTitle || 'YouTube'} &bull; Lección {currentVideoIndex + 1} de {totalCount}
             </p>
           </div>
@@ -181,7 +207,7 @@ export const CourseView: React.FC = () => {
         {/* Right: Course Progress Badge & Favorite */}
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Progress Bar Badge */}
-          <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-[#eeede6] border border-[#dedcd3] text-xs">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-surface border border-line text-xs">
             {isCourseFinished ? (
               <div className="flex items-center gap-1.5 text-emerald-700 font-bold">
                 <Award className="w-4 h-4" />
@@ -189,10 +215,10 @@ export const CourseView: React.FC = () => {
               </div>
             ) : (
               <>
-                <span className="font-semibold text-[#555043]">{percent}%</span>
-                <div className="w-16 h-1.5 bg-[#dedcd3] rounded-full overflow-hidden hidden xs:block">
+                <span className="font-semibold text-fg-soft">{percent}%</span>
+                <div className="w-16 h-1.5 bg-line rounded-full overflow-hidden hidden xs:block">
                   <div
-                    className="h-full bg-[#0a192f] rounded-full transition-all duration-300"
+                    className="h-full bg-btn rounded-full transition-all duration-300"
                     style={{ width: `${percent}%` }}
                   />
                 </div>
@@ -205,12 +231,12 @@ export const CourseView: React.FC = () => {
             onClick={() => toggleFavorite(activeCourse.id)}
             className={`p-2 rounded-xl border transition-all ${
               activeCourse.isFavorite
-                ? 'bg-amber-400 text-[#0a192f] border-amber-300 shadow-xs'
-                : 'bg-[#eeede6] text-[#736d5a] hover:text-[#0a192f] border-[#dedcd3]'
+                ? 'bg-amber-400 text-fg border-amber-300 shadow-xs'
+                : 'bg-surface text-fg-muted hover:text-fg border-line'
             }`}
             title={activeCourse.isFavorite ? 'Quitar de favoritos' : 'Marcar favorito'}
           >
-            <Star className={`w-4 h-4 ${activeCourse.isFavorite ? 'fill-[#0a192f]' : ''}`} />
+            <Star className={`w-4 h-4 ${activeCourse.isFavorite ? 'fill-fg' : ''}`} />
           </button>
         </div>
       </header>
