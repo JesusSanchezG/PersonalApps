@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Turno 3x4 · tu calendario laboral personal: días de trabajo y descanso, consulta y modifica cualquier día.">
+  <meta name="theme-color" content="#f4f2ed" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#15181a" media="(prefers-color-scheme: dark)">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Turno">
+  <title>Turno · Calendario 3x4</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="shell">
+
+    <header class="topbar">
+      <div class="brand" aria-label="Turno 3x4">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i></span>
+        <span class="brand-name">turno</span>
+      </div>
+      <div class="topbar-actions">
+        <button id="settingsBtn" class="icon-btn" title="Ajustes" aria-label="Ajustes" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h.08a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.08a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/></svg>
+        </button>
+        <button id="themeToggle" class="icon-btn" title="Alternar tema" aria-label="Alternar tema claro y oscuro">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.4M12 19.6V22M4.9 4.9l1.7 1.7M17.4 17.4l1.7 1.7M2 12h2.4M19.6 12H22M4.9 19.1l1.7-1.7M17.4 6.6l1.7-1.7"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 13.4A8.3 8.3 0 0 1 10.6 3.6a8.2 8.2 0 0 0-.6 11.3 8.2 8.2 0 0 0 10.4-1.5z"/><path d="M18 14.3a6.4 6.4 0 0 1-8.3-8.3"/></svg>
+        </button>
+        <button id="installBtn" class="icon-btn" hidden title="Instalar aplicación" aria-label="Instalar aplicación">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="m8 11 4 4 4-4"/><path d="M4 19h16"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+
+      <section class="hero" id="hero" aria-live="polite">
+        <div class="hero-date">
+          <span id="heroDay" class="hero-day">lunes</span>
+          <span id="heroDate" class="hero-date-num">14 de septiembre</span>
+        </div>
+        <div class="hero-status" id="heroStatus">
+          <span class="hero-pill" id="heroPill">Trabajas</span>
+          <span class="hero-week" id="heroWeek">Semana A</span>
+        </div>
+        <p class="hero-sub" id="heroSub">Resumen de tu día según el turno 3x4</p>
+      </section>
+
+      <section class="card cal-card">
+        <div class="cal-head">
+          <button id="prevBtn" class="nav-btn" aria-label="Mes anterior">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>
+          </button>
+          <div class="cal-title" id="calTitle">septiembre 2026</div>
+          <button id="nextBtn" class="nav-btn" aria-label="Mes siguiente">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10 6 6 6-6 6"/></svg>
+          </button>
+        </div>
+        <div class="cal-weekdays" aria-hidden="true">
+          <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <div class="cal-foot">
+          <button id="todayBtn" class="ghost-btn">Hoy</button>
+          <label class="date-jump">
+            <span class="date-jump-label">Ir a una fecha</span>
+            <input type="date" id="dateInput" aria-label="Elegir fecha">
+          </label>
+        </div>
+      </section>
+
+      <section class="legend" aria-hidden="true">
+        <span class="lg"><i class="sw sw-work"></i>Trabajo</span>
+        <span class="lg"><i class="sw sw-rest"></i>Descanso</span>
+        <span class="lg"><i class="sw sw-today"></i>Hoy</span>
+        <span class="lg"><i class="sw sw-to-rest"></i>Cambiado a descanso</span>
+        <span class="lg"><i class="sw sw-to-work"></i>Cambiado a trabajo</span>
+      </section>
+
+      <p class="hint">Toca un día del calendario para ver su detalle o modificarlo.</p>
+    </main>
+
+    <footer class="foot">
+      <span>3×4 · una semana 4 días de trabajo, la siguiente 3</span>
+    </footer>
+  </div>
+
+  <div class="backdrop" id="sheetBackdrop" hidden>
+    <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetDay">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <div>
+          <div class="sheet-weekday" id="sheetDay">lunes</div>
+          <div class="sheet-full" id="sheetFull">14 · septiembre · 2026</div>
+        </div>
+        <button class="icon-btn" id="sheetClose" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+      <div class="sheet-status" id="sheetStatus">
+        <span class="sheet-pill" id="sheetPill">Trabajas</span>
+        <span class="sheet-week" id="sheetWeek">Semana A</span>
+      </div>
+      <div class="sheet-base" id="sheetBase">Base del turno: periodo de trabajo</div>
+
+      <div class="sheet-group" id="sheetActions">
+        <button data-set="work" class="act-btn act-work">Marcar como trabajo</button>
+        <button data-set="rest" class="act-btn act-rest">Marcar como descanso</button>
+        <button id="sheetReset" class="act-btn act-ghost" hidden>Restaurar turno base</button>
+      </div>
+
+      <label class="sheet-note">
+        <span>Nota <em>opcional · festivo, extra, etc.</em></span>
+        <input type="text" id="sheetNote" maxlength="40" placeholder="Ej. festivo nacional">
+      </label>
+      <div class="sheet-hint">Los cambios se guardan solo en este dispositivo.</div>
+    </div>
+  </div>
+
+  <div class="backdrop" id="settingsBackdrop" hidden>
+    <div class="sheet sheet-settings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <div>
+          <div class="sheet-weekday" id="settingsTitle">Ajustes</div>
+          <div class="sheet-full">Turno 3×4</div>
+        </div>
+        <button class="icon-btn" id="settingsClose" aria-label="Cerrar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </div>
+
+      <p class="settings-desc">
+        Cada semana alterna: una tendrás <strong>4 días de trabajo</strong> (lunes–martes y sábado–domingo) y
+        <strong>3 de descanso</strong>; la siguiente se invierte. Las semanas empiezan el lunes.
+      </p>
+
+      <div class="settings-field">
+        <label for="refDate">Semana base (lunes)</label>
+        <input type="date" id="refDate">
+      </div>
+      <div class="settings-field">
+        <span>Tipo de la semana base</span>
+        <div class="seg" role="radiogroup" aria-label="Tipo de semana base">
+          <button class="seg-btn" data-rtype="A">Semana A</button>
+          <button class="seg-btn" data-rtype="B">Semana B</button>
+        </div>
+        <p class="settings-note" id="refHint">Semana A: trabajo lune–martes y sábado–domingo.</p>
+      </div>
+
+      <button id="resetAll" class="act-btn act-ghost danger">Restablecer horario base</button>
+      <div class="sheet-hint" id="settingsMeta"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
