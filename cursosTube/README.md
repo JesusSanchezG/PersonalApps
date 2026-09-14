@@ -2,7 +2,9 @@
 
 Plataforma web estilo Udemy para convertir **cursos de YouTube** (playlists o videos largos) en cursos estructurados con seguimiento de progreso, apuntes y sincronización en la nube.
 
-> **Producción:** https://cursos.jesussanchez.me
+> **Producción:** https://misclases.jesussanchez.me
+>
+> 🗂 Este proyecto vive dentro del monorepo personal `personales`, en `cursosTube/`.
 
 ---
 
@@ -27,7 +29,7 @@ Plataforma web estilo Udemy para convertir **cursos de YouTube** (playlists o vi
 | Frontend | React 19 + TypeScript + Vite 8 |
 | Estilos | Tailwind CSS v4 |
 | Iconos | lucide-react |
-| Base de datos / Auth | Supabase (PostgreSQL + Auth) |
+| Base de datos / Auth | Supabase (PostgreSQL + Auth), mantenido activo con keep-alive en el VPS (ver más abajo) |
 | API de YouTube | oEmbed + instancias públicas Invidious/Piped (gratis) |
 | Despliegue | VPS IONOS + Nginx + Certbot (Let's Encrypt) |
 
@@ -63,49 +65,57 @@ VITE_SUPABASE_ANON_KEY=tu_anon_public_key
 4. En **Authentication → Providers → Email**, desactiva **"Confirm email"** para que el registro sea inmediato.
 5. Sin Supabase configurado la app funciona igual con almacenamiento local.
 
+### Keep-alive de Supabase (gratis)
+
+El plan gratuito de Supabase **pausa el proyecto tras ~7 días sin actividad**, y deja la BD fría hasta el siguiente request. Como este repo se usa poco, se mantiene activo con un cron en el VPS de IONOS (que está siempre encendido):
+
+```bash
+# 1. Copiar el script al VPS (una vez)
+install -m 755 tools/keepalive.sh /usr/local/bin/cursostube-keepalive
+
+# 2. Añadir la línea al crontab del VPS (crontab -e)
+#    0 */6 * * * SUPABASE_URL=https://TU_PROYECTO.supabase.co SUPABASE_ANON_KEY=tu_anon_public_key \
+#        /usr/local/bin/cursostube-keepalive >> /var/log/cursostube-keepalive.log 2>&1
+```
+
+Cada 6 horas hace un `GET` a PostgREST que despierta el compute; es más que suficiente frente al umbral de 7 días. El script está en `tools/keepalive.sh` (solo necesita `curl`).
+
 ---
 
 ## 🚀 Despliegue en IONOS (VPS + Nginx)
 
-El servidor ya tiene Nginx y Certbot configurados. Cada dominio vive en `/var/www/<dominio>`.
+El despliegue lo hace el workflow de GitHub Actions del monorepo (`.github/workflows/deploy-cursos-tube.yml`), que compila y hace `rsync` al VPS en cada push a `main` que toca `cursosTube/**`. Necesita estos **secrets** en el repo `personales`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VPS_HOST`, `VPS_PORT`, `VPS_SSH_KEY`.
 
-### 1. Compilar
+Manual (fallback), desde `cursosTube/`:
 
 ```bash
 npm run build
-```
-
-### 2. Subir al servidor
-
-```bash
-rsync -az --delete dist/ ionos:/var/www/cursos.jesussanchez.me/
+rsync -az --delete dist/ ionos:/var/www/misclases.jesussanchez.me/
 ```
 
 (`ionos` es un alias SSH definido en `~/.ssh/config` apuntando a tu VPS.)
 
-### 3. Configuración inicial (solo la primera vez)
-
-Ya realizada en el despliegue inicial; documentada aquí por si se replica:
+### Configuración inicial (solo la primera vez)
 
 ```bash
 # Crear la carpeta del sitio
-ssh ionos "mkdir -p /var/www/cursos.jesussanchez.me"
+ssh ionos "mkdir -p /var/www/misclases.jesussanchez.me"
 
 # Crear el server block de nginx (ver plantilla abajo)
-ssh ionos "nano /etc/nginx/sites-available/cursos.jesussanchez.me"
-ln -sf /etc/nginx/sites-available/cursos.jesussanchez.me /etc/nginx/sites-enabled/
+ssh ionos "nano /etc/nginx/sites-available/misclases.jesussanchez.me"
+ln -sf /etc/nginx/sites-available/misclases.jesussanchez.me /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
 
-# Certificado SSL
-certbot --nginx -d cursos.jesussanchez.me --non-interactive --agree-tos
+# Certificado SSL + keep-alive de Supabase (ver sección anterior)
+certbot --nginx -d misclases.jesussanchez.me --non-interactive --agree-tos
 ```
 
 Plantilla del server block (SPA):
 
 ```nginx
 server {
-    server_name cursos.jesussanchez.me;
-    root /var/www/cursos.jesussanchez.me;
+    server_name misclases.jesussanchez.me;
+    root /var/www/misclases.jesussanchez.me;
     index index.html;
 
     gzip on;
@@ -132,16 +142,7 @@ server {
 
 ## 🔄 Flujo de trabajo con GitHub
 
-### Subir el proyecto por primera vez
-
-```bash
-git init
-git add .
-git commit -m "Primer commit: CursosTube"
-git branch -M main
-git remote add origin https://github.com/TU_USUARIO/cursos-web.git
-git push -u origin main
-```
+El código vive en el monorepo `personales` (rama `main`).
 
 ### Después de cada cambio (desarrollo → GitHub → producción)
 
@@ -155,10 +156,13 @@ git add .
 git commit -m "Descripción del cambio"
 git push
 
-# 3. Desplegar en producción (desde tu máquina)
-npm run build
-rsync -az --delete dist/ ionos:/var/www/cursos.jesussanchez.me/
+# 3. Desplegar en producción: automático
+#    El workflow del monorepo compila y hace rsync al VPS (misclases.jesussanchez.me)
+#    cuando el push toca cursosTube/**. Fallback manual:
+rsync -az --delete dist/ ionos:/var/www/misclases.jesussanchez.me/
 ```
+
+> Cambios en otras apps del monorepo (p. ej. `calendarioTrabajo/`) **no** disparan el despliegue de CursosTube (filtro de rutas en el workflow).
 
 ### Reglas de oro
 
@@ -185,6 +189,7 @@ rsync -az --delete dist/ ionos:/var/www/cursos.jesussanchez.me/
 ```
 ├── ideas/                 # Mockups de referencia
 ├── supabase/schema.sql    # Esquema de base de datos + RLS
+├── tools/keepalive.sh     # Keep-alive de Supabase para el VPS (ver sección anterior)
 ├── src/
 │   ├── components/
 │   │   ├── auth/          # Modal de login/registro
