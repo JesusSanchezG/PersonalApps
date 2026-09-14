@@ -1,4 +1,4 @@
-# Turno · Calendario 3×4
+# Calendario · 3×4
 
 Aplicación web (PWA) personal para tener siempre a mano tu calendario laboral **3×4**: una semana trabajas 4 días y descansas 3; la siguiente se invierte. Sin servidor, sin dependencias, funciona offline.
 

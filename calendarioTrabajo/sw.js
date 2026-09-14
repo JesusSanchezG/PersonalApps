@@ -1,5 +1,5 @@
-/* Turno 3x4 · service worker (offline + actualizaciones rápidas) */
-const VERSION = "turno-v2";
+/* Calendario 3x4 · service worker (offline + actualizaciones rápidas) */
+const VERSION = "calendario-v1";
 const CORE = [
   "./",
   "./index.html",

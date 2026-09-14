@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   Turno 3×4 · calendario laboral personal
+   Calendario 3×4 · aplicación de turnos laborales
    ============================================================ */
 
 const DAYS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];

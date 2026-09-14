@@ -1,6 +1,6 @@
 {
-  "name": "Turno · Calendario 3x4",
-  "short_name": "Turno",
+  "name": "Calendario · 3x4",
+  "short_name": "Calendario",
   "description": "Tu calendario laboral 3x4: días de trabajo y descanso, consulta cualquier fecha y guarda cambios.",
   "lang": "es",
   "start_url": "./",
