@@ -1,5 +1,7 @@
 # AGENTS.md
 
+> Estado de trabajo interrumpido: ver `PENDIENTE.md` (migración de CursosTube + Supabase en curso).
+
 Repositorio con aplicaciones web personales. Cada app vive en su propia carpeta sin dependencias cruzadas; algunas son vanilla sin build y otras traen su propio toolchain (Node/Vite). Hay dos ahora: `calendarioTrabajo` (PWA vanilla) y `cursosTube` (React/Vite + Supabase).
 
 ## Comandos
