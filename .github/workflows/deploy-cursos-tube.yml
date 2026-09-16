@@ -46,7 +46,7 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-        working-directory: '..'
+        working-directory: ${{ github.workspace }}
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
