@@ -53,5 +53,5 @@ jobs:
           echo "$VPS_SSH_KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -H -p "$VPS_PORT" "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          rsync -az --delete -e "ssh -p $VPS_PORT -i ~/.ssh/id_deploy" cursosTube/dist/ "root@$VPS_HOST:/var/www/misclases.jesussanchez.me/"
-          ssh -p "$VPS_PORT" -i ~/.ssh/id_deploy "root@$VPS_HOST" "chown -R 1000:1000 /var/www/misclases.jesussanchez.me"
+          rsync -az --delete -e "ssh -p $VPS_PORT -i ~/.ssh/id_deploy" cursosTube/dist/ "root@$VPS_HOST:/var/www/cursos.jesussanchez.me/"
+          ssh -p "$VPS_PORT" -i ~/.ssh/id_deploy "root@$VPS_HOST" "chown -R 1000:1000 /var/www/cursos.jesussanchez.me"

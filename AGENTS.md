@@ -26,7 +26,7 @@ No hay tests ni typecheck separado (`npm run build` ya corre `tsc -b`). Verifica
 
 ## cursosTube (/cursosTube)
 
-- React 19 + TypeScript + Vite + Tailwind v4. PWA generada con `vite-plugin-pwa`. Despliegue por GitHub Actions a `misclases.jesussanchez.me` (VPS IONOS).
+- React 19 + TypeScript + Vite + Tailwind v4. PWA generada con `vite-plugin-pwa`. Despliegue por GitHub Actions a `cursos.jesussanchez.me` (VPS IONOS).
 - Offline-first: cursos/progreso/notas viven en `localStorage` (`yt_courses_app_*`); la nube es Supabase (Postgres + login Google) y se usa solo con sesión iniciada.
 - Config de Supabase en `.env` (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) solo para el build; sin ella la app funciona en modo local.
 - **Keep-alive:** el plan gratuito de Supabase pausa el proyecto tras ~7 días sin actividad. El cron del VPS (`tools/keepalive.sh`, cada 6h) lo mantiene despierto. Si tocáis algo de esto, no romper el intervalo.

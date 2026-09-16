@@ -21,11 +21,12 @@ if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
   exit 1
 fi
 
-# Un simple GET despierta el compute de Supabase; PostgREST responde 200 con las cabeceras.
+# Un GET a /auth/v1/health despierta el compute de Supabase y responde 200
+# con la anon key. /rest/v1/ con anon ya no sirve: exige service_role.
 code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 \
   -H "apikey: $SUPABASE_ANON_KEY" \
   -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-  "$SUPABASE_URL/rest/v1/")"
+  "$SUPABASE_URL/auth/v1/health")"
 
 if [ "${code:-000}" = "200" ]; then
   echo "$(date -Is) OK: Supabase activo (HTTP $code)"

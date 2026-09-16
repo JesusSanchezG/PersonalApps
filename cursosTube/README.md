@@ -2,7 +2,7 @@
 
 Plataforma web estilo Udemy para convertir **cursos de YouTube** (playlists o videos largos) en cursos estructurados con seguimiento de progreso, apuntes y sincronización en la nube.
 
-> **Producción:** https://misclases.jesussanchez.me
+> **Producción:** https://cursos.jesussanchez.me
 >
 > 🗂 Este proyecto vive dentro del monorepo personal `personales`, en `cursosTube/`.
 
@@ -15,7 +15,7 @@ Plataforma web estilo Udemy para convertir **cursos de YouTube** (playlists o vi
 - **Al volver a una clase anterior**, el video arranca desde 0 (no salta sola a la siguiente).
 - **Apuntes por lección y por curso**: botón para insertar el minuto actual `[12:34]`, saltos rápidos a esos minutos, copiar/descargar en Markdown, guardado automático.
 - **Favoritos** con sección dedicada en el home.
-- **Sincronización en la nube con Supabase**: login por email + contraseña. Cursos, progreso y notas se sincronizan entre dispositivos (merge por fecha de modificación, sin pérdidas).
+- **Sincronización en la nube con Supabase**: login por Google. Cursos, progreso y notas se sincronizan entre dispositivos (merge por fecha de modificación, sin pérdidas).
 - **Offline-first**: los datos viven en `localStorage` como caché; la nube se usa solo con sesión iniciada.
 - **Eliminación segura en multi-dispositivo**: los cursos borrados no se "resucitan" al sincronizar (tombstones).
 - **Diseño minimalista** navy + gris ostra, responsive, con fullscreen de video contenido y rotación automática a horizontal en móvil.
@@ -78,7 +78,7 @@ install -m 755 tools/keepalive.sh /usr/local/bin/cursostube-keepalive
 #        /usr/local/bin/cursostube-keepalive >> /var/log/cursostube-keepalive.log 2>&1
 ```
 
-Cada 6 horas hace un `GET` a PostgREST que despierta el compute; es más que suficiente frente al umbral de 7 días. El script está en `tools/keepalive.sh` (solo necesita `curl`).
+Cada 6 horas hace un `GET` a `/auth/v1/health` (con la anon key) que despierta el compute; es más que suficiente frente al umbral de 7 días. El script está en `tools/keepalive.sh` (solo necesita `curl`).
 
 ---
 
@@ -90,32 +90,32 @@ Manual (fallback), desde `cursosTube/`:
 
 ```bash
 npm run build
-rsync -az --delete dist/ ionos:/var/www/misclases.jesussanchez.me/
+rsync -az --delete dist/ vps:/var/www/cursos.jesussanchez.me/
 ```
 
-(`ionos` es un alias SSH definido en `~/.ssh/config` apuntando a tu VPS.)
+(`vps` es un alias SSH definido en `~/.ssh/config` apuntando a tu VPS.)
 
 ### Configuración inicial (solo la primera vez)
 
 ```bash
 # Crear la carpeta del sitio
-ssh ionos "mkdir -p /var/www/misclases.jesussanchez.me"
+ssh vps "mkdir -p /var/www/cursos.jesussanchez.me"
 
 # Crear el server block de nginx (ver plantilla abajo)
-ssh ionos "nano /etc/nginx/sites-available/misclases.jesussanchez.me"
-ln -sf /etc/nginx/sites-available/misclases.jesussanchez.me /etc/nginx/sites-enabled/
+ssh vps "nano /etc/nginx/sites-available/cursos.jesussanchez.me"
+ln -sf /etc/nginx/sites-available/cursos.jesussanchez.me /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
 
 # Certificado SSL + keep-alive de Supabase (ver sección anterior)
-certbot --nginx -d misclases.jesussanchez.me --non-interactive --agree-tos
+certbot --nginx -d cursos.jesussanchez.me --non-interactive --agree-tos
 ```
 
 Plantilla del server block (SPA):
 
 ```nginx
 server {
-    server_name misclases.jesussanchez.me;
-    root /var/www/misclases.jesussanchez.me;
+    server_name cursos.jesussanchez.me;
+    root /var/www/cursos.jesussanchez.me;
     index index.html;
 
     gzip on;
@@ -157,9 +157,9 @@ git commit -m "Descripción del cambio"
 git push
 
 # 3. Desplegar en producción: automático
-#    El workflow del monorepo compila y hace rsync al VPS (misclases.jesussanchez.me)
+#    El workflow del monorepo compila y hace rsync al VPS (cursos.jesussanchez.me)
 #    cuando el push toca cursosTube/**. Fallback manual:
-rsync -az --delete dist/ ionos:/var/www/misclases.jesussanchez.me/
+rsync -az --delete dist/ vps:/var/www/cursos.jesussanchez.me/
 ```
 
 > Cambios en otras apps del monorepo (p. ej. `calendarioTrabajo/`) **no** disparan el despliegue de CursosTube (filtro de rutas en el workflow).
