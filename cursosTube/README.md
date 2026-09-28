@@ -99,7 +99,7 @@ Todas las rutas cuelgan de `/api` y exigen la cookie de sesión, salvo `GET /api
 Notas de diseño:
 
 - **El merge es por `updatedAt`, campo a campo.** Cada curso y cada entrada de `videoProgress` se comparan por su propia fecha, así que un dispositivo con el reloj atrasado no pisa la nota o la posición de otro dispositivo.
-- **Notas y posiciones nunca se pierden**: se escriben con `Math.floor` y se comparan como enteros, no como `float`.
+- **Cada curso y cada vídeo se comparan por su propio `updatedAt`.** Por eso la posición de una lección no pisa los apuntes de otra, aunque un dispositivo tenga el reloj atrasado.
 - **La API es idempotente**: subir dos veces el mismo curso no duplica nada.
 
 ### Variables de entorno del servidor
