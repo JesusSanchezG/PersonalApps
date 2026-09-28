@@ -10,12 +10,18 @@ import {
   saveOverallCourseNotes,
   getSettings,
   saveSettings,
-  removeSyncMapEntry,
   addDeletedCourseId
 } from '../services/storage';
 import { createCourseFromUrl, fetchVideoOEmbed, parseYouTubeUrl } from '../services/youtube';
 import { useAuth } from './AuthContext';
-import { syncAll, queuePushCourse, queuePushProgress, queuePushDelete, getRemoteStats } from '../services/sync';
+import {
+  syncAll,
+  queuePushCourse,
+  queuePushProgress,
+  queuePushDelete,
+  getServerStats,
+  flushPendingPushes,
+} from '../services/sync';
 
 interface CourseContextType {
   courses: Course[];
@@ -53,8 +59,8 @@ interface CourseContextType {
 const CourseContext = createContext<CourseContextType | undefined>(undefined);
 
 export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { session } = useAuth();
-  const userId = session?.user?.id ?? null;
+  const { user } = useAuth();
+  const isSignedIn = Boolean(user);
 
   const [courses, setCourses] = useState<Course[]>(() => getSavedCourses());
   const [allProgress, setAllProgress] = useState<Record<string, CourseProgress>>(() => getAllProgress());
@@ -86,36 +92,50 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [allProgress]);
 
-  // Full sync when a user signs in / session becomes available.
-  // Reusable via refreshSync (botón "Sincronizar ahora").
-  const uid = userId;
+  // Sincroniza con el servidor cuando hay sesión. Reusable desde
+  // refreshSync (botón "Sincronizar ahora").
   const refreshSync = useCallback(async (): Promise<string | null> => {
-    if (!uid) return null;
+    if (!isSignedIn) return null;
     setIsSyncing(true);
     setLastSyncError(null);
     try {
-      const res = await syncAll(uid, getSavedCourses(), getAllProgress());
+      const res = await syncAll();
       setCourses(res.courses);
       setAllProgress(res.allProgress);
       setLastSyncError(res.error);
       setLastSyncAt(Date.now());
-      // Refresca el contador de lo que hay en la nube (diagnóstico)
-      getRemoteStats(uid).then((stats) => setRemoteStats(stats));
+      // Refresca el contador de lo que hay en el servidor (diagnóstico)
+      getServerStats().then((stats) => setRemoteStats(stats));
       return res.error;
     } finally {
       setIsSyncing(false);
     }
-  }, [uid]);
+  }, [isSignedIn]);
 
   useEffect(() => {
-    if (!uid) return;
+    if (!isSignedIn) return;
     refreshSync();
-  }, [uid, refreshSync]);
+  }, [isSignedIn, refreshSync]);
+
+  // Al ocultar o cerrar la pestaña se vacía la cola de subidas: sin esto, la
+  // última posición de reproducción puede quedarse en el debounce y perderse.
+  useEffect(() => {
+    const onPageHide = () => flushPendingPushes();
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushPendingPushes();
+    };
+    window.addEventListener('pagehide', onPageHide);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', onPageHide);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, []);
 
   // Re-sincronización automática al volver a la pestaña (con sesión activa):
   // cubre cambios hechos en otro dispositivo mientras la app estaba en segundo plano
   useEffect(() => {
-    if (!uid) return;
+    if (!isSignedIn) return;
     const onFocus = () => {
       refreshSync();
     };
@@ -130,20 +150,20 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [uid, refreshSync]);
+  }, [isSignedIn, refreshSync]);
 
   // Sync periódico (cada 45s con sesión y app abierta): garantiza que los
   // cambios hechos en otros dispositivos lleguen aunque la pestaña nunca
   // pierda el foco
   useEffect(() => {
-    if (!uid) return;
+    if (!isSignedIn) return;
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
         refreshSync();
       }
     }, 45000);
     return () => clearInterval(interval);
-  }, [uid, refreshSync]);
+  }, [isSignedIn, refreshSync]);
 
   // Derived active course & progress
   const activeCourse = useMemo(() => {
@@ -183,12 +203,12 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return c;
       });
       setCourses(updated);
-      if (userId) {
+      if (isSignedIn) {
         const course = updated.find(c => c.id === activeCourseId);
-        if (course) queuePushCourse(userId, course);
+        if (course) queuePushCourse(course);
       }
     }
-  }, [activeCourseId, userId]);
+  }, [activeCourseId, isSignedIn]);
 
   // Add course
   const addCourse = useCallback(async (url: string, customTitle?: string): Promise<Course> => {
@@ -202,20 +222,19 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const initialProg = getCourseProgress(newCourse);
       setAllProgress(prev => ({ ...prev, [newCourse.id]: initialProg }));
 
-      if (userId) {
-        queuePushCourse(userId, newCourse);
-        queuePushProgress(userId, newCourse, initialProg);
+      if (isSignedIn) {
+        queuePushCourse(newCourse);
+        queuePushProgress(newCourse.id, initialProg);
       }
 
       return newCourse;
     } finally {
       setIsLoading(false);
     }
-  }, [settings.youtubeApiKey, userId]);
+  }, [settings.youtubeApiKey, isSignedIn]);
 
   // Delete course
   const deleteCourse = useCallback((courseId: string) => {
-    const course = getSavedCourses().find(c => c.id === courseId);
     setCourses(prev => prev.filter(c => c.id !== courseId));
     setAllProgress(prev => {
       const copy = { ...prev };
@@ -225,12 +244,13 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (activeCourseId === courseId) {
       setActiveCourse(null);
     }
-    if (userId && course) {
-      queuePushDelete(userId, course);
-      addDeletedCourseId(courseId);
+    // El tombstone se registra siempre: aunque estés sin sesión, al
+    // conectar no debe reaparecer el curso borrado.
+    addDeletedCourseId(courseId);
+    if (isSignedIn) {
+      queuePushDelete(courseId);
     }
-    removeSyncMapEntry(courseId);
-  }, [activeCourseId, setActiveCourse, userId]);
+  }, [activeCourseId, setActiveCourse, isSignedIn]);
 
   // Toggle favorite
   const toggleFavorite = useCallback((courseId: string) => {
@@ -241,21 +261,21 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         return c;
       });
-      if (userId) {
+      if (isSignedIn) {
         const course = updated.find(c => c.id === courseId);
-        if (course) queuePushCourse(userId, course);
+        if (course) queuePushCourse(course);
       }
       return updated;
     });
-  }, [userId]);
+  }, [isSignedIn]);
 
   // Update course metadata
   const updateCourse = useCallback((updated: Course) => {
     setCourses(prev => prev.map(c => (c.id === updated.id ? { ...updated, updatedAt: Date.now() } : c)));
-    if (userId) {
-      queuePushCourse(userId, { ...updated, updatedAt: Date.now() });
+    if (isSignedIn) {
+      queuePushCourse({ ...updated, updatedAt: Date.now() });
     }
-  }, [userId]);
+  }, [isSignedIn]);
 
   // Mark video watched / unwatched
   const markVideoWatched = useCallback((courseId: string, videoId: string, watched: boolean) => {
@@ -265,10 +285,10 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const updated = setVideoProgress(course, videoId, { watched });
     setAllProgress(prev => ({ ...prev, [courseId]: updated }));
 
-    if (userId) {
-      queuePushProgress(userId, course, updated);
+    if (isSignedIn) {
+      queuePushProgress(courseId, updated);
     }
-  }, [userId]);
+  }, [isSignedIn]);
 
   // Save video current seconds timestamp
   const saveVideoPosition = useCallback((courseId: string, videoId: string, seconds: number) => {
@@ -287,16 +307,18 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
     setCourses(updatedCourses);
 
-    if (userId) {
-      queuePushProgress(userId, course, updated);
-      // Only re-upload the course row when the video actually changed
-      // (avoids pushing every 3s during playback)
+    if (isSignedIn) {
+      // El segundo exacto de reproducción vive en el progreso (se sube con
+      // debounce de 2s), que es lo que CourseView lee al reabrir el curso.
+      queuePushProgress(courseId, updated);
+      // La fila del curso solo se sube cuando cambia la lección, para no
+      // enviar una petición cada 3 segundos durante la reproducción.
       const updatedCourse = updatedCourses.find(c => c.id === courseId);
       if (updatedCourse && updatedCourse.lastPlayedVideoId !== course.lastPlayedVideoId) {
-        queuePushCourse(userId, updatedCourse);
+        queuePushCourse(updatedCourse);
       }
     }
-  }, [userId]);
+  }, [isSignedIn]);
 
   // Save video notes
   const saveVideoNote = useCallback((courseId: string, videoId: string, notes: string) => {
@@ -316,16 +338,15 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         }
       };
-      if (userId) {
-        const course = getSavedCourses().find(c => c.id === courseId);
-        if (course) queuePushProgress(userId, course, updatedProgress);
+      if (isSignedIn) {
+        queuePushProgress(courseId, updatedProgress);
       }
       return {
         ...prev,
         [courseId]: updatedProgress
       };
     });
-  }, [userId]);
+  }, [isSignedIn]);
 
   // Save general course note
   const saveCourseNote = useCallback((courseId: string, notes: string) => {
@@ -338,16 +359,15 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         overallNotes: notes,
         updatedAt: Date.now()
       };
-      if (userId) {
-        const course = getSavedCourses().find(c => c.id === courseId);
-        if (course) queuePushProgress(userId, course, updatedProgress);
+      if (isSignedIn) {
+        queuePushProgress(courseId, updatedProgress);
       }
       return {
         ...prev,
         [courseId]: updatedProgress
       };
     });
-  }, [userId]);
+  }, [isSignedIn]);
 
   // Update user settings
   const updateSettings = useCallback((newSettings: Partial<UserSettings>) => {
@@ -444,7 +464,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     activeCourseProgress,
     isLoading,
     isSyncing,
-    isSignedIn: Boolean(userId),
+    isSignedIn,
     lastSyncError,
     lastSyncAt,
     remoteStats,
@@ -473,7 +493,7 @@ export const CourseProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     activeCourseProgress,
     isLoading,
     isSyncing,
-    userId,
+    isSignedIn,
     lastSyncError,
     lastSyncAt,
     remoteStats,

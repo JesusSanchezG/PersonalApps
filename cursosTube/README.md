@@ -1,10 +1,12 @@
 # CursosTube 🎓
 
-Plataforma web estilo Udemy para convertir **cursos de YouTube** (playlists o videos largos) en cursos estructurados con seguimiento de progreso, apuntes y sincronización en la nube.
+Plataforma web estilo Udemy para convertir **cursos de YouTube** (playlists o videos largos) en cursos estructurados con seguimiento de progreso, apuntes y sincronización.
 
 > **Producción:** https://cursos.jesussanchez.me
 >
 > 🗂 Este proyecto vive dentro del monorepo personal `personales`, en `cursosTube/`.
+>
+> 🔒 La cuenta es privada: todo el contenido (cursos, progreso y apuntes) requiere iniciar sesión con usuario y contraseña.
 
 ---
 
@@ -12,11 +14,12 @@ Plataforma web estilo Udemy para convertir **cursos de YouTube** (playlists o vi
 
 - **Añadir cursos de YouTube** pegando la URL de una playlist o un video individual (sin necesidad de API key: usa endpoints públicos gratuitos con fallback automático).
 - **Progreso automático**: al terminar un video se marca con una bolita verde, se guarda el checkpoint (segundo exacto) y hay autoplay hacia la siguiente clase con 1s de espera.
+- **Reanudación**: al volver a entrar en un curso, el player arranca en el segundo exacto donde lo dejaste y en la clase correcta.
 - **Al volver a una clase anterior**, el video arranca desde 0 (no salta sola a la siguiente).
 - **Apuntes por lección y por curso**: botón para insertar el minuto actual `[12:34]`, saltos rápidos a esos minutos, copiar/descargar en Markdown, guardado automático.
 - **Favoritos** con sección dedicada en el home.
-- **Sincronización en la nube con Supabase**: login por Google. Cursos, progreso y notas se sincronizan entre dispositivos (merge por fecha de modificación, sin pérdidas).
-- **Offline-first**: los datos viven en `localStorage` como caché; la nube se usa solo con sesión iniciada.
+- **Cuenta privada con usuario y contraseña**: la contraseña se verifica contra un hash `scrypt` guardado en el servidor; el navegador solo recibe una cookie de sesión opaca.
+- **Offline-first**: los datos viven en `localStorage` como caché y se suben al servidor cuando hay conexión.
 - **Eliminación segura en multi-dispositivo**: los cursos borrados no se "resucitan" al sincronizar (tombstones).
 - **Diseño minimalista** navy + gris ostra, responsive, con fullscreen de video contenido y rotación automática a horizontal en móvil.
 
@@ -29,114 +32,158 @@ Plataforma web estilo Udemy para convertir **cursos de YouTube** (playlists o vi
 | Frontend | React 19 + TypeScript + Vite 8 |
 | Estilos | Tailwind CSS v4 |
 | Iconos | lucide-react |
-| Base de datos / Auth | Supabase (PostgreSQL + Auth), mantenido activo con keep-alive en el VPS (ver más abajo) |
+| Backend | Node 22 puro (`node:http` + `node:crypto`), **sin dependencias ni base de datos** |
+| Persistencia | Un único `state.json` en el VPS, escrito de forma atómica |
+| Auth | `scrypt` + cookie de sesión opaca (`HttpOnly`, `SameSite=Strict`, `Secure`) |
 | API de YouTube | oEmbed + instancias públicas Invidious/Piped (gratis) |
-| Despliegue | VPS IONOS + Nginx + Certbot (Let's Encrypt) |
+| Despliegue | VPS IONOS + Nginx (proxy a la API) + systemd + Certbot |
+
+> No hay `.env` ni claves de API: el frontend siempre habla con `/api` en el mismo origen.
 
 ---
 
 ## 📦 Uso en desarrollo
 
+El `dev` necesita dos procesos: la API y el Vite (que hace de proxy de `/api`).
+
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run api        # API en http://127.0.0.1:8787
+npm run dev        # http://localhost:5173 (proxy /api -> 8787)
+```
+
+Otros scripts:
+
+```bash
 npm run build      # compila a dist/
 npm run lint       # oxlint
 npm run preview    # sirve el build local
+npm run create-user   # crea o cambia la cuenta (ver abajo)
 ```
 
-### Configuración de Supabase (opcional pero recomendada)
+### Crear la cuenta
 
-1. Crea un proyecto en [supabase.com](https://supabase.com).
-2. Copia `.env.example` a `.env` y pega tus credenciales:
+El login por HTTP **nunca** crea cuentas: así, quien descubra un servidor recién desplegado no puede quedarse con él. La cuenta se configura por SSH, una sola vez.
 
 ```bash
-cp .env.example .env
+# Interactivo (pregunta usuario y contraseña; no queda en el historial)
+CURSOS_DATA_DIR=./server/data npm run create-user
 ```
 
-```env
-VITE_SUPABASE_URL=https://TU_PROYECTO.supabase.co
-VITE_SUPABASE_ANON_KEY=tu_anon_public_key
-```
-
-> ⚠️ `.env` está en `.gitignore` — **nunca lo subas a GitHub**. La anon key es pública por diseño y está protegida por Row Level Security.
-
-3. En el **SQL Editor** de Supabase, ejecuta el contenido de `supabase/schema.sql` (tablas + políticas RLS).
-4. En **Authentication → Providers → Email**, desactiva **"Confirm email"** para que el registro sea inmediato.
-5. Sin Supabase configurado la app funciona igual con almacenamiento local.
-
-### Keep-alive de Supabase (gratis)
-
-El plan gratuito de Supabase **pausa el proyecto tras ~7 días sin actividad**, y deja la BD fría hasta el siguiente request. Como este repo se usa poco, se mantiene activo con un cron en el VPS de IONOS (que está siempre encendido):
+O con variables de entorno (útil para provisionar el VPS):
 
 ```bash
-# 1. Copiar el script al VPS (una vez)
-install -m 755 tools/keepalive.sh /usr/local/bin/cursostube-keepalive
-
-# 2. Añadir la línea al crontab del VPS (crontab -e)
-#    0 */6 * * * SUPABASE_URL=https://TU_PROYECTO.supabase.co SUPABASE_ANON_KEY=tu_anon_public_key \
-#        /usr/local/bin/cursostube-keepalive >> /var/log/cursostube-keepalive.log 2>&1
+CURSOS_DATA_DIR=/opt/cursostube/data CURSOS_USER=jesus CURSOS_PASSWORD='...' \
+  node server/create-user.js
 ```
 
-Cada 6 horas hace un `GET` a `/auth/v1/health` (con la anon key) que despierta el compute; es más que suficiente frente al umbral de 7 días. El script está en `tools/keepalive.sh` (solo necesita `curl`).
+Para **cambiar la contraseña**, vuelve a ejecutar el script con la cuenta nueva: las sesiones ya abiertas siguen siendo válidas hasta que caduquen.
+
+---
+
+## 🔌 API
+
+Todas las rutas cuelgan de `/api` y exigen la cookie de sesión, salvo `GET /api/health`.
+
+| Método | Ruta | Qué hace |
+|---|---|---|
+| `GET` | `/api/health` | Estado y si hay cuenta creada (no requiere sesión) |
+| `GET` | `/api/session` | Usuario de la sesión actual, o `null` |
+| `POST` | `/api/session` | Login. Cuerpo `{ username, password }` |
+| `DELETE` | `/api/session` | Logout (invalida el token en el servidor) |
+| `GET` | `/api/state` | Estado completo: `{ courses, progress, updatedAt }` |
+| `PUT` | `/api/courses/:id` | Upsert de un curso. Responde `{ course }` |
+| `DELETE` | `/api/courses/:id` | Borra el curso **y** su progreso |
+| `PUT` | `/api/progress/:courseId` | Upsert de progreso y apuntes. Responde `{ progress }` |
+
+Notas de diseño:
+
+- **El merge es por `updatedAt`, campo a campo.** Cada curso y cada entrada de `videoProgress` se comparan por su propia fecha, así que un dispositivo con el reloj atrasado no pisa la nota o la posición de otro dispositivo.
+- **Notas y posiciones nunca se pierden**: se escriben con `Math.floor` y se comparan como enteros, no como `float`.
+- **La API es idempotente**: subir dos veces el mismo curso no duplica nada.
+
+### Variables de entorno del servidor
+
+| Variable | Por defecto | Para qué |
+|---|---|---|
+| `PORT` | `8787` | Puerto de escucha |
+| `HOST` | `127.0.0.1` | Solo local; nginx hace de proxy |
+| `CURSOS_DATA_DIR` | `server/data` | Dónde se guardan `auth.json`, `sessions.json` y `state.json` |
+| `CURSOS_SECURE_COOKIES` | *(desactivado)* | **Actívalo en producción**: marca la cookie como `Secure` |
 
 ---
 
 ## 🚀 Despliegue en IONOS (VPS + Nginx)
 
-El despliegue lo hace el workflow de GitHub Actions del monorepo (`.github/workflows/deploy-cursos-tube.yml`), que compila y hace `rsync` al VPS en cada push a `main` que toca `cursosTube/**`. Necesita estos **secrets** en el repo `personales`: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VPS_HOST`, `VPS_PORT`, `VPS_SSH_KEY`.
+El despliegue lo hace el workflow del monorepo (`.github/workflows/deploy-cursos-tube.yml`): en cada push a `main` que toca `cursosTube/**` compila, sube `dist/` y el código del servidor, y reinicia la API. Necesita estos **secrets** en el repo `personales`: `VPS_HOST`, `VPS_PORT`, `VPS_SSH_KEY`.
 
 Manual (fallback), desde `cursosTube/`:
 
 ```bash
 npm run build
 rsync -az --delete dist/ vps:/var/www/cursos.jesussanchez.me/
+rsync -az --delete --exclude 'data' server/ vps:/opt/cursostube/server/
+ssh vps "chown -R cursostube:cursostube /opt/cursostube \
+       && systemctl restart cursostube-api && nginx -t && systemctl reload nginx"
 ```
 
-(`vps` es un alias SSH definido en `~/.ssh/config` apuntando a tu VPS.)
+> `vps` es un alias SSH definido en `~/.ssh/config`. El `--exclude 'data'` es importante: sin él, un `rsync --delete` borraría los cursos y la cuenta del servidor.
 
 ### Configuración inicial (solo la primera vez)
 
 ```bash
-# Crear la carpeta del sitio
+# 1. Usuario de servicio y directorio de la API
+ssh vps "useradd --system --home /opt/cursostube --shell /usr/sbin/nologin cursostube
+         && mkdir -p /opt/cursostube/data && chown -R cursostube:cursostube /opt/cursostube
+         && chmod 700 /opt/cursostube/data"
+
+# 2. Código, unidad systemd y arranque
+rsync -az --delete --exclude 'data' server/ vps:/opt/cursostube/server/
+ssh vps "chown -R cursostube:cursostube /opt/cursostube
+         && install -m 644 /opt/cursostube/server/cursostube-api.service /etc/systemd/system/
+         && systemctl daemon-reload && systemctl enable --now cursostube-api"
+
+# 3. Cuenta
+ssh vps "sudo -u cursostube env CURSOS_DATA_DIR=/opt/cursostube/data \
+         CURSOS_USER=jesus CURSOS_PASSWORD='...' node /opt/cursostube/server/create-user.js"
+
+# 4. SPA + certificado
 ssh vps "mkdir -p /var/www/cursos.jesussanchez.me"
-
-# Crear el server block de nginx (ver plantilla abajo)
-ssh vps "nano /etc/nginx/sites-available/cursos.jesussanchez.me"
-ln -sf /etc/nginx/sites-available/cursos.jesussanchez.me /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
-
-# Certificado SSL + keep-alive de Supabase (ver sección anterior)
-certbot --nginx -d cursos.jesussanchez.me --non-interactive --agree-tos
+ssh vps "certbot --nginx -d cursos.jesussanchez.me --non-interactive --agree-tos"
 ```
 
-Plantilla del server block (SPA):
+Verifica que la API quedó viva (responde sin sesión, así que no hace falta login):
+
+```bash
+ssh vps "curl -sf http://127.0.0.1:8787/api/health"     # -> {"ok":true,"hasAccount":true}
+```
+
+### Nginx
+
+El server block sirve la SPA y hace de proxy a la API. El prefijo `^~` da prioridad al bloque `/api/` sobre el regex de assets de abajo:
 
 ```nginx
-server {
-    server_name cursos.jesussanchez.me;
-    root /var/www/cursos.jesussanchez.me;
-    index index.html;
+location ^~ /api/ {
+    proxy_pass http://127.0.0.1:8787;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 30s;
+    client_max_body_size 8m;
+}
 
-    gzip on;
-    gzip_vary on;
-    gzip_proxied any;
-    gzip_comp_level 6;
-    gzip_types text/plain text/css text/xml application/json application/javascript image/svg+xml;
-
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    location ~* \.(?:ico|css|js|gif|jpe?g|png|svg|woff2?|eot|ttf|otf)$ {
-        expires 6M;
-        access_log off;
-        add_header Cache-Control "public, max-age=15552000, immutable";
-    }
+location / {
+    try_files $uri $uri/ /index.html;
 }
 ```
 
-> Los assets de Vite tienen hash (`index-abc123.js`), así que la caché inmutable es segura: cada deploy genera nombres nuevos.
+> Los assets de Vite llevan hash (`index-abc123.js`), así que la caché inmutable es segura: cada deploy genera nombres nuevos. El service worker se sirve con `no-cache` a propósito.
+
+### La unidad systemd
+
+`server/cursostube-api.service` corre la API como el usuario sin privilegios `cursostube`, con `ProtectSystem=strict` y `ReadWritePaths` limitado a `data/`: el proceso no puede escribir nada más en el disco.
 
 ---
 
@@ -144,60 +191,54 @@ server {
 
 El código vive en el monorepo `personales` (rama `main`).
 
-### Después de cada cambio (desarrollo → GitHub → producción)
-
 ```bash
-# 1. Ver qué cambió
-git status
-git diff
-
-# 2. Subir los cambios a GitHub
-git add .
-git commit -m "Descripción del cambio"
-git push
-
-# 3. Desplegar en producción: automático
-#    El workflow del monorepo compila y hace rsync al VPS (cursos.jesussanchez.me)
-#    cuando el push toca cursosTube/**. Fallback manual:
-rsync -az --delete dist/ vps:/var/www/cursos.jesussanchez.me/
+git status && git diff
+git add . && git commit -m "Descripción del cambio" && git push
+# El despliegue a producción es automático (workflow) si el push toca cursosTube/**
 ```
 
 > Cambios en otras apps del monorepo (p. ej. `calendarioTrabajo/`) **no** disparan el despliegue de CursosTube (filtro de rutas en el workflow).
 
 ### Reglas de oro
 
-- **Nunca** hagas `git add` de `.env`, `node_modules/` o `dist/` (ya están en `.gitignore`).
-- La **anon key de Supabase** es pública por diseño (protegida por RLS); el **service_role key** jamás debe aparecer en el frontend ni en el repo.
-- Si clonas el proyecto en otra máquina: `cp .env.example .env` y pega tus credenciales.
-- Certbot renueva el certificado automáticamente (tarea programada en el servidor).
+- **Nunca** hagas `git add` de `node_modules/`, `dist/` ni `server/data/` (ya están en `.gitignore`).
+- `server/data/` contiene el hash de la contraseña y las sesiones: solo `cursostube` puede leerlo (`700`/`600`).
+- Para hacer una copia de seguridad no hay nada más que `state.json` (y `auth.json` si quieres conservar la contraseña).
 
 ---
 
 ## 🔒 Seguridad
 
-| Qué | Dónde está | ¿Existe riesgo? |
+| Qué | Dónde está | Notas |
 |---|---|---|
-| Anon key Supabase | `.env` (ignorado) | No — pública por diseño, RLS protege los datos |
-| Service role key | Nunca en el repo | Nunca exponer |
-| Datos de usuarios | PostgreSQL Supabase | RLS: cada usuario solo ve/edita sus filas |
-| Credenciales SSH | `~/.ssh/` (fuera del repo) | No |
+| Contraseña de la cuenta | `data/auth.json` (hash `scrypt`, 600) | Nunca sale del VPS en claro |
+| Tokens de sesión | `data/sessions.json` (hash SHA-256, 600) | Se guardan hasheados; el token va en la cookie |
+| Datos de cursos | `data/state.json` (600) | Solo accesibles con una sesión válida |
+| Intentos de login | En memoria, 8 por IP cada 15 min | Devuelve `429` al superarlos |
+| Credenciales SSH | `~/.ssh/` (fuera del repo) | Secretos de GitHub Actions, nunca en el código |
+
+La API además rechaza peticiones cuyo `Origin` no coincida con el `Host`, y limita el cuerpo a 4 MB.
 
 ---
 
 ## 📁 Estructura del proyecto
 
 ```
-├── ideas/                 # Mockups de referencia
-├── supabase/schema.sql    # Esquema de base de datos + RLS
-├── tools/keepalive.sh     # Keep-alive de Supabase para el VPS (ver sección anterior)
+├── ideas/                          # Mockups de referencia
+├── server/
+│   ├── index.js                    # Router HTTP, validaciones, rate limit
+│   ├── auth.js                     # scrypt, sesiones, cookie
+│   ├── store.js                    # state.json, merges, escritura atómica
+│   ├── create-user.js              # Alta/cambio de cuenta por SSH
+│   └── cursostube-api.service      # Unidad systemd
 ├── src/
 │   ├── components/
-│   │   ├── auth/          # Modal de login/registro
-│   │   ├── common/        # Navbar, Modal
-│   │   ├── course/        # Reproductor, temario, notas, curso
-│   │   └── home/          # Home, tarjetas, favoritos, añadir curso
-│   ├── context/           # AuthContext, CourseContext
-│   ├── services/          # youtube.ts, storage.ts, sync.ts, supabaseClient.ts
-│   └── types/             # Tipos del dominio
-└── .env.example           # Plantilla de configuración (copiar a .env)
+│   │   ├── auth/                   # Modal de login
+│   │   ├── common/                 # Navbar, Modal
+│   │   ├── course/                 # Reproductor, temario, notas, curso
+│   │   └── home/                   # Home, tarjetas, favoritos, añadir curso
+│   ├── context/                    # AuthContext, CourseContext
+│   ├── services/                   # youtube.ts, storage.ts, api.ts, sync.ts
+│   └── types/                      # Tipos del dominio
+└── dist/                           # Build (ignorado por git)
 ```

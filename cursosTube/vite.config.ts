@@ -5,6 +5,17 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig({
+  server: {
+    // En desarrollo la API corre aparte (`npm run api`). El proxy hace que
+    // ambos vivan en el mismo origen, igual que en producción detrás de nginx:
+    // así la cookie de sesión se comporta de la misma forma en los dos.
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:8787',
+        changeOrigin: false,
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),

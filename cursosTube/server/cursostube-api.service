@@ -1,0 +1,52 @@
+# Unidad systemd de la API de CursosTube.
+#
+# Instalación en el VPS:
+#   useradd --system --home /opt/cursostube --shell /usr/sbin/nologin cursostube
+#   mkdir -p /opt/cursostube && chown cursostube:cursostube /opt/cursostube
+#   install -m 644 server/cursostube-api.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now cursostube-api
+#
+[Unit]
+Description=CursosTube API (cursos, progreso y apuntes)
+Documentation=https://github.com/JesusSanchezG/PersonalApps/tree/main/cursosTube
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cursostube
+Group=cursostube
+WorkingDirectory=/opt/cursostube
+
+# La cookie de sesión va por HTTPS (nginx termina TLS), así que necesita Secure.
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=8787
+Environment=CURSOS_DATA_DIR=/opt/cursostube/data
+Environment=CURSOS_SECURE_COOKIES=1
+
+ExecStart=/usr/bin/node /opt/cursostube/server/index.js
+
+Restart=always
+RestartSec=5
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+# Endurecimiento: el proceso solo puede escribir en data/.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ReadWritePaths=/opt/cursostube/data
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cursostube-api
+
+[Install]
+WantedBy=multi-user.target

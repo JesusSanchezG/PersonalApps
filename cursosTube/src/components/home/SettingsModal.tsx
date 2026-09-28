@@ -3,15 +3,15 @@ import { Key, Play, Download, Upload, Check, AlertCircle, ShieldCheck, Cloud, Lo
 import { Modal } from '../common/Modal';
 import type { UserSettings } from '../../types/course';
 import { getAllProgress, getSavedCourses, saveCourses, saveAllProgress } from '../../services/storage';
-import { testCloudConnection, type CloudTestResult } from '../../services/sync';
-import type { User } from '@supabase/supabase-js';
+import { testServerConnection, type ServerTestResult } from '../../services/sync';
+import type { AuthUser } from '../../services/api';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: UserSettings;
   onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
-  user: User | null;
+  user: AuthUser | null;
   isSignedIn: boolean;
   onSignOut: () => Promise<void>;
   onOpenAuthModal: () => void;
@@ -39,7 +39,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<CloudTestResult | null>(null);
+  const [testResult, setTestResult] = useState<ServerTestResult | null>(null);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,7 +115,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title="Configuración y Almacenamiento"
-      subtitle="Ajustes de reproducción, API y respaldo en tu navegador"
+      subtitle="Ajustes de reproducción, API y respaldo"
       maxWidth="md"
     >
       <form onSubmit={handleSave} className="space-y-6">
@@ -131,9 +131,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               <div className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
                   <span className="text-xs font-semibold text-fg block truncate">
-                    {user?.user_metadata?.display_name || 'Usuario'}
+                    {user?.username}
                   </span>
-                  <span className="text-[11px] text-fg-muted block truncate">{user?.email}</span>
+                  <span className="text-[11px] text-fg-muted block truncate">Sesión activa</span>
                 </div>
                 <button
                   type="button"
@@ -148,13 +148,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               </div>
               <p className="text-[11px] text-emerald-700 mt-2 flex items-center gap-1">
                 <Check className="w-3 h-3" />
-                Tus cursos, progreso y notas se sincronizan en la nube.
+                Tus cursos, progreso y notas se guardan en tu servidor.
               </p>
             </div>
           ) : (
             <div className="p-3 rounded-xl bg-surface border border-line">
               <p className="text-[11px] text-fg-muted leading-relaxed mb-2">
-                Inicia sesión para guardar tus cursos y progreso en la nube y continuar desde cualquier dispositivo.
+                Inicia sesión para guardar tus cursos y progreso en tu servidor y continuar desde cualquier dispositivo.
               </p>
               <button
                 type="button"
@@ -162,7 +162,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-btn hover:bg-btn-hover text-white text-xs font-semibold transition-colors"
               >
                 <LogIn className="w-3.5 h-3.5 text-sky-300" />
-                Iniciar sesión con Google
+                Iniciar sesión
               </button>
             </div>
           )}
@@ -172,16 +172,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             <div className="p-3 rounded-xl bg-surface-2/60 border border-line text-[11px] space-y-1.5">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-fg">Cuenta</span>
-                <span className="text-fg-muted truncate ml-2">{user.email}</span>
+                <span className="text-fg-muted truncate ml-2">{user.username}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="font-semibold text-fg">ID de usuario</span>
-                <span className="text-fg-muted font-mono text-[10px] truncate ml-2">
-                  {(user.id || '').slice(0, 8)}…
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-fg">Cursos en la nube</span>
+                <span className="font-semibold text-fg">Cursos en el servidor</span>
                 <span className="text-fg-muted">
                   {remoteStats.error ? (
                     <span className="text-red-700">{remoteStats.error}</span>
@@ -209,7 +203,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 onClick={async () => {
                   setIsTesting(true);
                   setTestResult(null);
-                  const result = await testCloudConnection(user.id);
+                  const result = await testServerConnection(user.username);
                   setTestResult(result);
                   setIsTesting(false);
                 }}
@@ -221,7 +215,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 ) : (
                   <Activity className="w-3 h-3 text-sky-300" />
                 )}
-                {isTesting ? 'Probando...' : 'Probar conexión con Supabase'}
+                {isTesting ? 'Probando...' : 'Probar conexión con el servidor'}
               </button>
 
               {testResult && (
@@ -247,14 +241,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     }`}
                   >
                     {testResult.ok
-                      ? `Todo correcto: ${testResult.coursesInCloud} curso(s) en la nube para esta cuenta`
+                      ? `Todo correcto: ${testResult.coursesInServer} curso(s) en el servidor`
                       : 'La conexión falló — revisa el paso marcado en rojo'}
                   </p>
                 </div>
               )}
 
               <p className="text-[10px] text-fg-muted pt-1 border-t border-line/70">
-                Si el ID de usuario difiere entre dispositivos, son cuentas distintas y los datos no se comparten.
+                Tus datos viven solo en tu VPS. Haz una copia con "Exportar Copia" de vez en cuando.
               </p>
             </div>
           )}
@@ -328,10 +322,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         <div className="space-y-2 pt-2 border-t border-line">
           <h4 className="text-xs font-bold text-fg uppercase tracking-wider flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
-            Copia de Seguridad (LocalStorage)
+            Copia de Seguridad (JSON)
           </h4>
           <p className="text-[11px] text-fg-muted">
-            Todos tus cursos, marcas de progreso y apuntes se guardan localmente en tu navegador. Puedes exportarlos en cualquier momento.
+            Exporta tus cursos, progreso y apuntes a un fichero JSON. Es la única copia que vive fuera del servidor, así que conviene guardar de vez en cuando.
           </p>
 
           <div className="flex flex-wrap gap-2 pt-1">

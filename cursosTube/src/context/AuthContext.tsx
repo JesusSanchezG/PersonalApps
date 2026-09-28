@@ -1,94 +1,83 @@
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  useMemo,
-} from 'react';
-import type { Session, User } from '@supabase/supabase-js';
-import { getSupabase, isSupabaseConfigured } from '../services/supabaseClient';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  fetchSession,
+  login as apiLogin,
+  logout as apiLogout,
+  setUnauthorizedHandler,
+  type AuthUser,
+} from '../services/api';
 
 interface AuthResult {
   error: string | null;
 }
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: AuthUser | null;
   isAuthLoading: boolean;
-  isSupabaseConfigured: boolean;
-  signInWithGoogle: () => Promise<AuthResult>;
+  signIn: (username: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
+  // La cookie de sesión es la única fuente de verdad: al cargar la app solo
+  // hay que preguntar al servidor si sigue viva.
   useEffect(() => {
     let cancelled = false;
-    let subscription: { unsubscribe: () => void } | null = null;
 
     (async () => {
-      const client = await getSupabase();
-      if (cancelled) return;
-
-      if (!client) {
-        setIsAuthLoading(false);
-        return;
+      try {
+        const current = await fetchSession();
+        if (!cancelled) setUser(current);
+      } catch {
+        // Servidor inalcanzable: se sigue como usuario local. La app
+        // funciona igual y sincronizará cuando vuelva la red.
+        if (!cancelled) setUser(null);
+      } finally {
+        if (!cancelled) setIsAuthLoading(false);
       }
-
-      const { data } = await client.auth.getSession();
-      if (cancelled) return;
-      setSession(data.session);
-      setIsAuthLoading(false);
-
-      const { data: sub } = client.auth.onAuthStateChange((_event, newSession) => {
-        setSession(newSession);
-        setIsAuthLoading(false);
-      });
-      subscription = sub.subscription;
     })();
 
     return () => {
       cancelled = true;
-      subscription?.unsubscribe();
     };
   }, []);
 
-  const signInWithGoogle = useCallback(async (): Promise<AuthResult> => {
-    const client = await getSupabase();
-    if (!client) return { error: 'Supabase no está configurado.' };
-    const { error } = await client.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin,
-      },
-    });
-    if (error) {
-      return { error: error.message };
+  // Si el servidor responde 401 en cualquier punto (sesión caducada, cookie
+  // borrada...), la sesión se cae aquí y la app vuelve al estado local.
+  useEffect(() => {
+    setUnauthorizedHandler(() => setUser(null));
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
+  const signIn = useCallback(async (username: string, password: string): Promise<AuthResult> => {
+    try {
+      const authenticated = await apiLogin(username.trim(), password);
+      setUser(authenticated);
+      return { error: null };
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : 'No se pudo iniciar sesión' };
     }
-    return { error: null };
   }, []);
 
   const signOut = useCallback(async () => {
-    const client = await getSupabase();
-    await client?.auth.signOut();
+    try {
+      await apiLogout();
+    } catch {
+      // Si el servidor no responde, la cookie caduca sola: seguir como
+      // invitado es un resultado aceptable.
+    } finally {
+      setUser(null);
+    }
   }, []);
 
   const value = useMemo(
-    () => ({
-      user: session?.user ?? null,
-      session,
-      isAuthLoading,
-      isSupabaseConfigured,
-      signInWithGoogle,
-      signOut,
-    }),
-    [session, isAuthLoading, signInWithGoogle, signOut]
+    () => ({ user, isAuthLoading, signIn, signOut }),
+    [user, isAuthLoading, signIn, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

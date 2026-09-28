@@ -1,573 +1,299 @@
-import type { Course, CourseProgress, VideoProgress } from '../types/course';
-import { getSupabase, isSupabaseConfigured } from './supabaseClient';
+/**
+ * Sincronización con el servidor propio (CoursesTube API).
+ *
+ * El servidor es la fuente de verdad, pero el localStorage sigue siendo la
+ * copia de trabajo: sin red la app se lee igual y las mutaciones se encolan.
+ * Cuando vuelve la conexión, `syncAll` repara cualquier subida que se haya
+ * quedado a medias comparando `updatedAt`.
+ */
+import type { Course, CourseProgress } from '../types/course';
 import {
-  getSyncMap,
-  saveSyncMap,
+  ApiError,
+  fetchHealth,
+  fetchState,
+  pushCourse,
+  pushDelete,
+  pushProgress,
+} from './api';
+import {
   getDeletedCourseIds,
+  getSavedCourses,
+  getAllProgress,
+  saveAllProgress,
+  saveCourses,
   saveDeletedCourseIds,
 } from './storage';
 
 /* ============================================================
-   Tipos de filas remotas (espejo del esquema SQL)
+   Descarga y fusión
    ============================================================ */
 
-interface CourseRow {
-  id: string;
-  user_id: string;
-  local_id: string | null;
-  youtube_url: string;
-  type: string;
-  playlist_id: string | null;
-  title: string;
-  channel_title: string | null;
-  description: string | null;
-  thumbnail_url: string;
-  is_favorite: boolean;
-  videos: unknown;
-  last_played_video_id: string | null;
-  last_played_timestamp: number;
-  created_at: string;
-  updated_at: string;
-}
-
-interface ProgressRow {
-  id: string;
-  user_id: string;
-  course_id: string;
-  video_id: string;
-  watched: boolean;
-  completed_at: string | null;
-  last_position_seconds: number;
-  notes: string;
-  updated_at: string;
-}
-
-interface NotesRow {
-  id: string;
-  user_id: string;
-  course_id: string;
-  overall_notes: string;
-  updated_at: string;
-}
-
-/* ============================================================
-   Conversores local <-> remoto
-   ============================================================ */
-
-/**
- * Genera un UUID v4 en el navegador. Se usa como id de filas nuevas
- * para no depender del default (gen_random_uuid) de la base de datos.
- */
-function uuid(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-function rowToCourse(row: CourseRow): Course {
-  const localId = row.local_id || `remote_${row.id}`;
-  return {
-    id: localId,
-    youtubeUrl: row.youtube_url,
-    type: (row.type as Course['type']) || 'playlist',
-    playlistId: row.playlist_id || undefined,
-    title: row.title,
-    channelTitle: row.channel_title || undefined,
-    description: row.description || undefined,
-    thumbnailUrl: row.thumbnail_url,
-    isFavorite: row.is_favorite,
-    createdAt: new Date(row.created_at).getTime(),
-    updatedAt: new Date(row.updated_at).getTime(),
-    lastPlayedVideoId: row.last_played_video_id || undefined,
-    lastPlayedTimestamp: row.last_played_timestamp || 0,
-    videos: Array.isArray(row.videos) ? (row.videos as Course['videos']) : [],
-  };
-}
-
-function courseToRow(course: Course, userId: string, map: Record<string, string>): CourseRow {
-  return {
-    id: map[course.id] || uuid(),
-    user_id: userId,
-    local_id: course.id,
-    youtube_url: course.youtubeUrl,
-    type: course.type,
-    playlist_id: course.playlistId || null,
-    title: course.title,
-    channel_title: course.channelTitle || null,
-    description: course.description || null,
-    thumbnail_url: course.thumbnailUrl,
-    is_favorite: course.isFavorite,
-    videos: course.videos,
-    last_played_video_id: course.lastPlayedVideoId || null,
-    last_played_timestamp: Math.floor(course.lastPlayedTimestamp || 0),
-    created_at: new Date(course.createdAt || Date.now()).toISOString(),
-    updated_at: new Date(course.updatedAt || Date.now()).toISOString(),
-  };
-}
-
-function progressToRow(
-  userId: string,
-  courseId: string,
-  vp: VideoProgress
-): ProgressRow {
-  return {
-    id: uuid(),
-    user_id: userId,
-    course_id: courseId,
-    video_id: vp.videoId,
-    watched: vp.watched,
-    completed_at: vp.completedAt ? new Date(vp.completedAt).toISOString() : null,
-    last_position_seconds: Math.floor(vp.lastPositionSeconds || 0),
-    notes: vp.notes || '',
-    updated_at: new Date(vp.updatedAt || Date.now()).toISOString(),
-  };
-}
-
-function rowToVideoProgress(row: ProgressRow): VideoProgress {
-  return {
-    videoId: row.video_id,
-    watched: row.watched,
-    completedAt: row.completed_at ? new Date(row.completed_at).getTime() : undefined,
-    lastPositionSeconds: row.last_position_seconds || 0,
-    notes: row.notes || '',
-    updatedAt: new Date(row.updated_at).getTime(),
-  };
-}
-
-/* ============================================================
-   Sincronización completa (login / inicio de sesión activa)
-   Estrategia: subir todo lo local -> traer remoto -> merge
-   por updatedAt (gana el más reciente; empate -> local).
-   ============================================================ */
-
-export async function syncAll(
-  userId: string,
-  localCourses: Course[],
-  localProgress: Record<string, CourseProgress>
-): Promise<{
+export interface SyncResult {
   courses: Course[];
   allProgress: Record<string, CourseProgress>;
   error: string | null;
-}> {
-  if (!isSupabaseConfigured) {
-    return { courses: localCourses, allProgress: localProgress, error: 'Supabase no configurado' };
+}
+
+/** Ganador por `updatedAt`. A igualdad gana lo local: quien escribe ve el cambio. */
+function newerOf<T extends { updatedAt?: number }>(local: T | undefined, remote: T | undefined): T {
+  if (!local) return remote as T;
+  if (!remote) return local;
+  return (remote.updatedAt || 0) > (local.updatedAt || 0) ? remote : local;
+}
+
+/**
+ * Mezcla el progreso vídeo a vídeo: guardar la posición de una lección no
+ * puede pisar los apuntes de otra.
+ */
+function mergeProgress(
+  local: CourseProgress,
+  remote: CourseProgress
+): CourseProgress {
+  const videoProgress = { ...local.videoProgress };
+  for (const [videoId, remoteVp] of Object.entries(remote.videoProgress || {})) {
+    const localVp = videoProgress[videoId];
+    if (!localVp || (remoteVp.updatedAt || 0) > (localVp.updatedAt || 0)) {
+      videoProgress[videoId] = remoteVp;
+    }
   }
 
-  const client = await getSupabase();
-  if (!client) {
-    return { courses: localCourses, allProgress: localProgress, error: 'Supabase no configurado' };
-  }
+  const remoteNotesAreNewer = (remote.updatedAt || 0) > (local.updatedAt || 0);
+  const watchedCount = Object.values(videoProgress).filter((vp) => vp.watched).length;
+  const total = remote.totalVideosCount || local.totalVideosCount || 0;
 
+  return {
+    ...local,
+    videoProgress,
+    overallNotes: remoteNotesAreNewer ? remote.overallNotes : local.overallNotes,
+    completedVideosCount: watchedCount,
+    totalVideosCount: total,
+    isCourseCompleted: total > 0 && watchedCount === total,
+    updatedAt: Math.max(remote.updatedAt || 0, local.updatedAt || 0),
+  };
+}
+
+export async function syncAll(): Promise<SyncResult> {
+  const localCourses = getSavedCourses();
+  const localProgress = getAllProgress();
+
+  let remote: { courses: Course[]; progress: Record<string, CourseProgress> };
   try {
-    // 1) Subir cursos (upsert por user_id+local_id) y obtener el mapa de ids
-    const map = { ...getSyncMap() };
-
-    if (localCourses.length > 0) {
-      const rows = localCourses.map((c) => courseToRow(c, userId, map));
-      const { data, error } = await client
-        .from('courses')
-        .upsert(rows, { onConflict: 'user_id,local_id' })
-        .select('id,local_id');
-      if (error) {
-        console.error('[sync] error al subir cursos:', error);
-        return {
-          courses: localCourses,
-          allProgress: localProgress,
-          error: `No se pudieron subir los cursos: ${error.message}`,
-        };
-      }
-      if (data) {
-        for (const r of data as { id: string; local_id: string | null }[]) {
-          if (r.local_id) map[r.local_id] = r.id;
-        }
-      }
-    }
-
-    // 2) Subir progreso y notas de cada curso local
-    for (const course of localCourses) {
-      const remoteId = map[course.id];
-      const prog = localProgress[course.id];
-      if (!remoteId || !prog) continue;
-
-      const rows = Object.values(prog.videoProgress)
-        .filter((vp) => vp.videoId)
-        .map((vp) => progressToRow(userId, remoteId, vp));
-      if (rows.length > 0) {
-        const { error: progError } = await client
-          .from('video_progress')
-          .upsert(rows, { onConflict: 'user_id,course_id,video_id' });
-        if (progError) {
-          console.error('[sync] error al subir progreso:', progError);
-          return {
-            courses: localCourses,
-            allProgress: localProgress,
-            error: `No se pudo subir el progreso: ${progError.message}`,
-          };
-        }
-      }
-      const { error: notesError } = await client
-        .from('course_notes')
-        .upsert(
-          {
-            id: uuid(),
-            user_id: userId,
-            course_id: remoteId,
-            overall_notes: prog.overallNotes || '',
-            updated_at: new Date(prog.updatedAt || Date.now()).toISOString(),
-          },
-          { onConflict: 'user_id,course_id' }
-        );
-      if (notesError) {
-        console.error('[sync] error al subir notas:', notesError);
-        return {
-          courses: localCourses,
-          allProgress: localProgress,
-          error: `No se pudieron subir las notas: ${notesError.message}`,
-        };
-      }
-    }
-
-    saveSyncMap(map);
-
-    // 3) Traer datos remotos
-    const { data: courseRows, error: pullCoursesError } = await client
-      .from('courses')
-      .select('*')
-      .eq('user_id', userId);
-
-    if (pullCoursesError) {
-      console.error('[sync] error al descargar cursos:', pullCoursesError);
-      return {
-        courses: localCourses,
-        allProgress: localProgress,
-        error: 'No se pudieron descargar los cursos de la nube. Revisa tu conexión e inténtalo de nuevo.',
-      };
-    }
-
-    const remoteCourses: Course[] = [];
-    const remoteUuids: string[] = [];
-    const remoteByLocal = new Map<string, Course>();
-
-    for (const row of (courseRows || []) as CourseRow[]) {
-      const c = rowToCourse(row);
-      remoteCourses.push(c);
-      remoteUuids.push(row.id);
-      if (row.local_id) {
-        remoteByLocal.set(row.local_id, c);
-        map[row.local_id] = row.id;
-      }
-    }
-
-    // 3b) Tombstones: borra del servidor los cursos eliminados localmente
-    //     (evita que se "resuciten" al sincronizar desde otro dispositivo).
-    const deletedIds = getDeletedCourseIds();
-    if (deletedIds.length > 0) {
-      const remainingTombstones: string[] = [];
-      for (const localId of deletedIds) {
-        const remoteRow = (courseRows || []).find((r) => r.local_id === localId);
-        if (!remoteRow) continue; // ya no existe en el servidor: nada que borrar
-        const { error } = await client
-          .from('courses')
-          .delete()
-          .eq('id', remoteRow.id)
-          .eq('user_id', userId);
-        if (error) {
-          remainingTombstones.push(localId);
-        }
-      }
-      saveDeletedCourseIds(remainingTombstones);
-    }
-
-    let progressRows: ProgressRow[] = [];
-    let notesRows: NotesRow[] = [];
-    if (remoteUuids.length > 0) {
-      const [{ data: p, error: progressError }, { data: n, error: notesError }] = await Promise.all([
-        client.from('video_progress').select('*').in('course_id', remoteUuids),
-        client.from('course_notes').select('*').in('course_id', remoteUuids),
-      ]);
-      if (progressError) console.error('[sync] error al descargar progreso:', progressError);
-      if (notesError) console.error('[sync] error al descargar notas:', notesError);
-      progressRows = (p || []) as ProgressRow[];
-      notesRows = (n || []) as NotesRow[];
-    }
-
-    // 4) Fusionar cursos (gana el más reciente por updatedAt)
-    const mergedCourses: Course[] = [...localCourses];
-    const localIndex = new Map(mergedCourses.map((c, i) => [c.id, i]));
-
-    for (const rc of remoteCourses) {
-      const idx = localIndex.get(rc.id);
-      if (idx === undefined) {
-        mergedCourses.push(rc);
-        localIndex.set(rc.id, mergedCourses.length - 1);
-      } else if (rc.updatedAt > mergedCourses[idx].updatedAt) {
-        mergedCourses[idx] = rc;
-      }
-    }
-
-    // 5) Fusionar progreso (por video, gana updatedAt más reciente)
-    const mergedProgress: Record<string, CourseProgress> = { ...localProgress };
-
-    const remoteProgressByCourse = new Map<string, CourseProgress>();
-    for (const row of courseRows || []) {
-      const r = row as CourseRow;
-      const localId = r.local_id || `remote_${r.id}`;
-      const vp: Record<string, VideoProgress> = {};
-      for (const pr of progressRows.filter((x) => x.course_id === r.id)) {
-        vp[pr.video_id] = rowToVideoProgress(pr);
-      }
-      const notes = notesRows.find((x) => x.course_id === r.id);
-      const videoCount = Array.isArray(r.videos) ? (r.videos as unknown[]).length : 0;
-      const watchedCount = Object.values(vp).filter((x) => x.watched).length;
-      remoteProgressByCourse.set(localId, {
-        courseId: localId,
-        completedVideosCount: watchedCount,
-        totalVideosCount: videoCount,
-        isCourseCompleted: videoCount > 0 && watchedCount === videoCount,
-        overallNotes: notes?.overall_notes || '',
-        videoProgress: vp,
-        updatedAt: notes ? new Date(notes.updated_at).getTime() : undefined,
-      });
-    }
-
-    for (const [cid, remoteProg] of remoteProgressByCourse) {
-      const localProg = mergedProgress[cid];
-      if (!localProg) {
-        mergedProgress[cid] = remoteProg;
-        continue;
-      }
-
-      const videoProgress = { ...localProg.videoProgress };
-      for (const [vid, rp] of Object.entries(remoteProg.videoProgress)) {
-        const lp = videoProgress[vid];
-        if (!lp || (rp.updatedAt || 0) > (lp.updatedAt || 0)) {
-          videoProgress[vid] = rp;
-        }
-      }
-
-      const remoteNotesNewer =
-        remoteProg.overallNotes &&
-        (remoteProg.updatedAt || 0) > (localProg.updatedAt || 0);
-
-      const watchedCount = Object.values(videoProgress).filter((x) => x.watched).length;
-      mergedProgress[cid] = {
-        ...localProg,
-        videoProgress,
-        completedVideosCount: watchedCount,
-        totalVideosCount: remoteProg.totalVideosCount || localProg.totalVideosCount,
-        isCourseCompleted:
-          (remoteProg.totalVideosCount || localProg.totalVideosCount) > 0 &&
-          watchedCount === (remoteProg.totalVideosCount || localProg.totalVideosCount),
-        overallNotes: remoteNotesNewer ? remoteProg.overallNotes : localProg.overallNotes,
-        updatedAt: Math.max(remoteProg.updatedAt || 0, localProg.updatedAt || 0),
-      };
-    }
-
-    saveSyncMap(map);
-    return { courses: mergedCourses, allProgress: mergedProgress, error: null };
+    remote = await fetchState<Course, CourseProgress>();
   } catch (e) {
-    console.error('Sync error:', e);
     return {
       courses: localCourses,
       allProgress: localProgress,
-      error: `Error al sincronizar con la nube: ${e instanceof Error ? e.message : String(e)}`,
-    };
-  }
-}
-
-/* ============================================================
-   Diagnóstico de conexión paso a paso (botón en Ajustes).
-   Muestra exactamente en qué punto falla la comunicación
-   con Supabase desde el navegador.
-   ============================================================ */
-
-export interface CloudTestResult {
-  ok: boolean;
-  steps: { name: string; ok: boolean; detail: string }[];
-  coursesInCloud: number;
-}
-
-export async function testCloudConnection(userId: string): Promise<CloudTestResult> {
-  const steps: CloudTestResult['steps'] = [];
-
-  if (!isSupabaseConfigured) {
-    return {
-      ok: false,
-      steps: [{ name: 'Configuración', ok: false, detail: 'Supabase no configurado en el .env del build' }],
-      coursesInCloud: 0,
+      error: describeError(e, 'No se pudo contactar con el servidor'),
     };
   }
 
-  const client = await getSupabase().catch((e) => {
-    steps.push({ name: 'Cargar librería Supabase', ok: false, detail: String(e) });
-    return null;
-  });
-  if (!client) {
-    if (steps.length === 0) {
-      steps.push({ name: 'Cargar librería Supabase', ok: false, detail: 'Cliente no disponible' });
+  const remoteById = new Map(remote.courses.map((c) => [c.id, c]));
+  const tombstones = new Set(getDeletedCourseIds());
+
+  // Un curso borrado aquí no debe volver por/download: fuera de la mezcla.
+  for (const id of tombstones) remoteById.delete(id);
+
+  /* 1) Borrados: propagarlos al servidor si aún siguen ahí. */
+  for (const id of tombstones) {
+    if (!remote.courses.some((c) => c.id === id)) continue;
+    try {
+      await pushDelete(id);
+    } catch (e) {
+      console.error('[sync] no se pudo borrar el curso del servidor:', e);
     }
-    return { ok: false, steps, coursesInCloud: 0 };
   }
-  steps.push({ name: 'Cargar librería Supabase', ok: true, detail: 'Cliente creado correctamente' });
 
-  const { data: userRes, error: userErr } = await client.auth.getUser();
-  if (userErr || !userRes?.user) {
-    steps.push({
-      name: 'Sesión de usuario',
-      ok: false,
-      detail: userErr?.message || 'No hay sesión activa',
-    });
-    return { ok: false, steps, coursesInCloud: 0 };
+  /* 2) Mezclar cursos: gana el más reciente de cada lado. */
+  const merged = new Map<string, Course>();
+  for (const course of localCourses) {
+    if (!tombstones.has(course.id)) merged.set(course.id, course);
   }
-  steps.push({
-    name: 'Sesión de usuario',
-    ok: true,
-    detail: `${userRes.user.email || 'usuario'} (${userRes.user.id.slice(0, 8)}…)`,
-  });
-
-  const { data, error } = await client.from('courses').select('id').eq('user_id', userId);
-  if (error) {
-    steps.push({
-      name: 'Leer tabla courses',
-      ok: false,
-      detail: `${error.code || 'HTTP'}: ${error.message}`,
-    });
-    return { ok: false, steps, coursesInCloud: 0 };
+  for (const [id, remoteCourse] of remoteById) {
+    merged.set(id, newerOf(merged.get(id), remoteCourse));
   }
-  steps.push({
-    name: 'Leer tabla courses',
-    ok: true,
-    detail: `${(data || []).length} fila(s) encontradas para este usuario`,
-  });
+  const mergedCourses = [...merged.values()];
 
-  return { ok: true, steps, coursesInCloud: (data || []).length };
+  /* 3) Mezclar progreso por curso. */
+  const mergedProgress: Record<string, CourseProgress> = {};
+  for (const course of mergedCourses) {
+    const local = localProgress[course.id];
+    const remoteProg = remote.progress[course.id];
+    if (local && remoteProg) mergedProgress[course.id] = mergeProgress(local, remoteProg);
+    else mergedProgress[course.id] = (local || remoteProg) as CourseProgress;
+  }
+
+  /* 4) Subir lo que el servidor aún no tiene o tiene más viejo.
+        Esto es lo que repara las subidas que fallaron sin conexión. */
+  const toPushCourses: Course[] = [];
+  for (const course of mergedCourses) {
+    const serverCopy = remoteById.get(course.id);
+    if (!serverCopy || (course.updatedAt || 0) > (serverCopy.updatedAt || 0)) {
+      toPushCourses.push(course);
+    }
+  }
+
+  for (const course of toPushCourses) {
+    try {
+      const saved = await pushCourse(course);
+      remoteById.set(course.id, saved);
+    } catch (e) {
+      console.error('[sync] no se pudo subir el curso:', e);
+    }
+  }
+
+  for (const courseId of Object.keys(mergedProgress)) {
+    const local = localProgress[courseId];
+    const serverCopy = remote.progress[courseId];
+    const shouldPush = !serverCopy || (local && (local.updatedAt || 0) > (serverCopy.updatedAt || 0));
+    if (!shouldPush || !local) continue;
+    try {
+      mergedProgress[courseId] = await pushProgress(courseId, local);
+    } catch (e) {
+      console.error('[sync] no se pudo subir el progreso:', e);
+    }
+  }
+
+  // Los borrados ya están aplicados en el servidor: dejan de ser tombstones.
+  const stillDeleted = [...tombstones].filter((id) => remoteById.has(id));
+  saveDeletedCourseIds(stillDeleted);
+
+  saveCourses(mergedCourses);
+  saveAllProgress(mergedProgress);
+
+  return { courses: mergedCourses, allProgress: mergedProgress, error: null };
+}
+
+function describeError(e: unknown, fallback: string): string {
+  if (e instanceof ApiError) {
+    if (!e.reached) return `${fallback}: sin red. Los cambios se guardan en este dispositivo.`;
+    return e.message;
+  }
+  return `${fallback}: ${e instanceof Error ? e.message : String(e)}`;
 }
 
 /* ============================================================
-   Pushes puntuales (mutaciones en tiempo real, con debounce)
+   Subidas puntuales con debounce
    ============================================================ */
 
+type PendingPush =
+  | { kind: 'course'; course: Course }
+  | { kind: 'progress'; courseId: string; progress: CourseProgress }
+  | { kind: 'delete'; courseId: string };
+
+const pending = new Map<string, PendingPush>();
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
-function debounced(key: string, ms: number, fn: () => void) {
+async function sendPush(push: PendingPush) {
+  switch (push.kind) {
+    case 'course':
+      await pushCourse(push.course);
+      break;
+    case 'progress':
+      await pushProgress(push.courseId, push.progress);
+      break;
+    case 'delete':
+      await pushDelete(push.courseId);
+      break;
+  }
+}
+
+async function flushKey(key: string) {
   clearTimeout(timers.get(key));
-  timers.set(
-    key,
-    setTimeout(() => {
-      timers.delete(key);
-      fn();
-    }, ms)
-  );
+  timers.delete(key);
+  const push = pending.get(key);
+  if (!push) return;
+  pending.delete(key);
+  try {
+    await sendPush(push);
+  } catch (e) {
+    // No se pierde: syncAll repara lo que falte en el siguiente intento.
+    console.warn('[sync] subida aplazada, se reintentará al sincronizar:', e);
+  }
 }
 
-export function queuePushCourse(userId: string, course: Course) {
-  if (!isSupabaseConfigured) return;
-  debounced(`course_${course.id}`, 500, async () => {
-    const client = await getSupabase();
-    if (!client) return;
-    const map = { ...getSyncMap() };
-    const { data, error } = await client
-      .from('courses')
-      .upsert([courseToRow(course, userId, map)], { onConflict: 'user_id,local_id' })
-      .select('id,local_id');
-    if (!error && data && data[0]) {
-      const r = data[0] as { id: string; local_id: string | null };
-      if (r.local_id) {
-        map[r.local_id] = r.id;
-        saveSyncMap(map);
-      }
-    } else if (error) {
-      console.error('[sync] error al subir curso:', error);
-    }
-  });
+/** Última escritura gana: varias mutaciones seguidas = una sola petición. */
+function schedule(key: string, push: PendingPush, ms: number) {
+  pending.set(key, push);
+  clearTimeout(timers.get(key));
+  timers.set(key, setTimeout(() => void flushKey(key), ms));
 }
 
-export function queuePushProgress(
-  userId: string,
-  course: Course,
-  progress: CourseProgress
-) {
-  if (!isSupabaseConfigured) return;
-  debounced(`progress_${course.id}`, 2000, async () => {
-    const client = await getSupabase();
-    if (!client) return;
-    const remoteId = getSyncMap()[course.id];
-    if (!remoteId) return;
-    const rows = Object.values(progress.videoProgress)
-      .filter((vp) => vp.videoId)
-      .map((vp) => progressToRow(userId, remoteId, vp));
-    if (rows.length > 0) {
-      const { error } = await client
-        .from('video_progress')
-        .upsert(rows, { onConflict: 'user_id,course_id,video_id' });
-      if (error) console.error('[sync] error al subir progreso:', error);
-    }
-    const { error: notesError } = await client
-      .from('course_notes')
-      .upsert(
-        {
-          id: uuid(),
-          user_id: userId,
-          course_id: remoteId,
-          overall_notes: progress.overallNotes || '',
-          updated_at: new Date(progress.updatedAt || Date.now()).toISOString(),
-        },
-        { onConflict: 'user_id,course_id' }
-      );
-    if (notesError) console.error('[sync] error al subir notas:', notesError);
-  });
+export function queuePushCourse(course: Course) {
+  schedule(`course_${course.id}`, { kind: 'course', course }, 500);
 }
 
-export function queuePushDelete(userId: string, course: Course) {
-  if (!isSupabaseConfigured) return;
-  const remoteId = getSyncMap()[course.id];
-  if (!remoteId) return;
-  debounced(`delete_${course.id}`, 300, async () => {
-    const client = await getSupabase();
-    if (!client) return;
-    const { error } = await client
-      .from('courses')
-      .delete()
-      .eq('id', remoteId)
-      .eq('user_id', userId);
-    if (error) console.error('[sync] error al borrar curso remoto:', error);
-    const map = getSyncMap();
-    delete map[course.id];
-    saveSyncMap(map);
-  });
+export function queuePushProgress(courseId: string, progress: CourseProgress) {
+  schedule(`progress_${courseId}`, { kind: 'progress', courseId, progress }, 2000);
+}
+
+export function queuePushDelete(courseId: string) {
+  schedule(`delete_${courseId}`, { kind: 'delete', courseId }, 300);
+}
+
+/**
+ * Vacía la cola al instante. Se llama al cerrar la pestaña para que la última
+ * posición de reproducción no se quede en el debounce.
+ */
+export function flushPendingPushes() {
+  for (const key of [...timers.keys()]) void flushKey(key);
 }
 
 /* ============================================================
-   Diagnóstico: cuántos cursos/progreso hay en la nube para el
-   usuario actual (se muestra en Ajustes para verificar que la
-   cuenta de cada dispositivo es la misma y que sí se guarda).
+   Diagnóstico (botón en Ajustes)
    ============================================================ */
 
-export async function getRemoteStats(
-  userId: string
-): Promise<{ courses: number; progress: number; error: string | null }> {
-  if (!isSupabaseConfigured) {
-    return { courses: 0, progress: 0, error: 'Supabase no configurado' };
-  }
+export interface ServerTestResult {
+  ok: boolean;
+  steps: { name: string; ok: boolean; detail: string }[];
+  coursesInServer: number;
+}
+
+export async function testServerConnection(username: string | null): Promise<ServerTestResult> {
+  const steps: ServerTestResult['steps'] = [];
+
   try {
-    const client = await getSupabase();
-    if (!client) return { courses: 0, progress: 0, error: 'Supabase no configurado' };
-    const [{ data: c, error: e1 }, { data: p, error: e2 }] = await Promise.all([
-      client.from('courses').select('id').eq('user_id', userId),
-      client.from('video_progress').select('id').eq('user_id', userId),
-    ]);
-    if (e1 || e2) {
-      console.error('[sync] error al consultar estadísticas:', e1 || e2);
-      return { courses: 0, progress: 0, error: 'Error al consultar la nube' };
+    const health = await fetchHealth();
+    steps.push({
+      name: 'Servidor accesible',
+      ok: health.ok,
+      detail: health.hasAccount ? 'API viva' : 'API viva pero sin cuenta creada',
+    });
+    if (!health.hasAccount) {
+      return { ok: false, steps, coursesInServer: 0 };
     }
-    return { courses: (c || []).length, progress: (p || []).length, error: null };
   } catch (e) {
-    console.error('[sync] error en getRemoteStats:', e);
-    return { courses: 0, progress: 0, error: 'Error al consultar la nube' };
+    steps.push({ name: 'Servidor accesible', ok: false, detail: describeError(e, 'Error de red') });
+    return { ok: false, steps, coursesInServer: 0 };
+  }
+
+  const user = username ? `sesión de ${username}` : 'sin sesión';
+  steps.push({ name: 'Sesión', ok: Boolean(username), detail: user });
+  if (!username) return { ok: false, steps, coursesInServer: 0 };
+
+  try {
+    const state = await fetchState<Course, CourseProgress>();
+    const count = state.courses.length;
+    steps.push({ name: 'Leer tus datos', ok: true, detail: `${count} curso(s) en el servidor` });
+    return { ok: true, steps, coursesInServer: count };
+  } catch (e) {
+    steps.push({ name: 'Leer tus datos', ok: false, detail: describeError(e, 'Error al leer') });
+    return { ok: false, steps, coursesInServer: 0 };
+  }
+}
+
+export async function getServerStats(): Promise<{
+  courses: number;
+  progress: number;
+  error: string | null;
+}> {
+  try {
+    const state = await fetchState<Course, CourseProgress>();
+    return {
+      courses: state.courses.length,
+      progress: Object.keys(state.progress).length,
+      error: null,
+    };
+  } catch (e) {
+    return { courses: 0, progress: 0, error: describeError(e, 'Error al consultar el servidor') };
   }
 }

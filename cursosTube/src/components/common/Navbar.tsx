@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Settings, BookOpen, Layers, LogIn, LogOut, Cloud, Loader2, RefreshCw, Sun, Moon } from 'lucide-react';
-import type { User } from '@supabase/supabase-js';
+import type { AuthUser } from '../../services/api';
 import { getInitialTheme, toggleTheme, type Theme } from '../../services/theme';
 
 interface NavbarProps {
@@ -8,7 +8,7 @@ interface NavbarProps {
   onOpenSettingsModal: () => void;
   totalCoursesCount: number;
   onLogoClick: () => void;
-  user: User | null;
+  user: AuthUser | null;
   isAuthLoading: boolean;
   isSyncing: boolean;
   onOpenAuthModal: () => void;
@@ -35,9 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     setTheme((current) => toggleTheme(current));
   };
 
-  const initials = user?.email
-    ? user.email.slice(0, 2).toUpperCase()
-    : '';
+  const initials = user?.username ? user.username.slice(0, 2).toUpperCase() : '';
 
   return (
     <header className="sticky top-0 z-30 bg-page/90 backdrop-blur-md border-b border-line transition-colors">
@@ -102,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   onClick={() => setShowUserMenu(v => !v)}
                   className="flex items-center gap-2 p-1.5 rounded-xl bg-surface border border-line hover:bg-surface-2 transition-colors"
-                  title={user.email || 'Cuenta'}
+                  title={user.username || 'Cuenta'}
                 >
                   <div className="w-7 h-7 rounded-lg bg-btn text-sky-300 flex items-center justify-center text-xs font-bold">
                     {initials}
@@ -114,12 +112,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <div className="absolute right-0 mt-2 w-56 rounded-xl bg-page border border-line shadow-xl py-1.5 z-20 animate-in fade-in zoom-in-95 duration-100">
                     <div className="px-3 py-2 border-b border-line">
                       <p className="text-[11px] font-bold text-fg truncate">
-                        {user.user_metadata?.display_name || 'Usuario'}
+                        {user.username}
                       </p>
-                      <p className="text-[11px] text-fg-muted truncate">{user.email}</p>
                       <p className="text-[10px] text-emerald-700 mt-0.5 flex items-center gap-1">
                         <Cloud className="w-2.5 h-2.5" />
-                        Sincronizado en la nube
+                        Sincronizado con tu servidor
                       </p>
                     </div>
                     <button

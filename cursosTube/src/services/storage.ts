@@ -4,7 +4,6 @@ const STORAGE_KEYS = {
   COURSES: 'yt_courses_app_courses_v1',
   PROGRESS: 'yt_courses_app_progress_v1',
   SETTINGS: 'yt_courses_app_settings_v1',
-  SYNC_MAP: 'yt_courses_app_sync_map_v1',
 };
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -194,35 +193,31 @@ export function saveOverallCourseNotes(courseId: string, notes: string): void {
 }
 
 /**
- * Sync map: local course id -> remote Supabase course uuid
+ * Al migrar de Supabase al servidor propio se decidió empezar de cero. Las
+ * claves localStorage no cambian, así que sin esto la primera carga traería
+ * de vuelta los cursos y notas del servicio anterior.
+ *
+ * Se ejecuta una sola vez (lo llama main.tsx antes de renderizar) y solo
+ * borra claves del propio proyecto: el tema y el resto de preferencias se
+ * respetan.
  */
-export function getSyncMap(): Record<string, string> {
+const FRESH_START_KEY = 'yt_courses_app_fresh_start_v1';
+
+export function clearLegacyDataOnce(): void {
   try {
-    const raw = localStorage.getItem(STORAGE_KEYS.SYNC_MAP);
-    return raw ? JSON.parse(raw) : {};
+    if (localStorage.getItem(FRESH_START_KEY)) return;
+    localStorage.setItem(FRESH_START_KEY, new Date().toISOString());
+    for (const key of Object.keys(localStorage)) {
+      if (key.startsWith('yt_courses_app_')) localStorage.removeItem(key);
+    }
   } catch {
-    return {};
+    // Modo privado o cuota agotada: la app arranca igual, sin caché previa.
   }
-}
-
-export function saveSyncMap(map: Record<string, string>): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.SYNC_MAP, JSON.stringify(map));
-  } catch (e) {
-    console.error('Error saving sync map:', e);
-  }
-}
-
-export function removeSyncMapEntry(courseId: string): void {
-  const map = getSyncMap();
-  if (!(courseId in map)) return;
-  delete map[courseId];
-  saveSyncMap(map);
 }
 
 /**
- * Tombstones: ids of courses deleted locally, so a later sync on another
- * device does not resurrect them from the cloud.
+ * Tombstones: ids de cursos borrados localmente, para que una sincronización
+ * posterior desde otro dispositivo no los vuelva a traer del servidor.
  */
 const DELETED_KEY = 'yt_courses_app_deleted_v1';
 

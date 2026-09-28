@@ -27,5 +27,8 @@ dev-dist
 # Environment (contains keys)
 .env
 
+# Datos del servidor: cuenta, sesiones y cursos. Nunca al repo.
+server/data/
+
 # Mockups y archivos de diseño locales (no van al repo)
 ideas/
