@@ -51,29 +51,39 @@ jobs:
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -H -p "$VPS_PORT" "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
+          # rsync no lee la clave del secret por su cuenta: hay que pasarle -e.
+          RSYNC_SSH="ssh -p $VPS_PORT -i $HOME/.ssh/id_deploy"
+          SSH="ssh -p $VPS_PORT -i $HOME/.ssh/id_deploy"
+
           # SPA en el directorio que sirve nginx
-          rsync -az --delete cursosTube/dist/ "root@$VPS_HOST:/var/www/cursos.jesussanchez.me/"
+          rsync -az --delete -e "$RSYNC_SSH" cursosTube/dist/ "root@$VPS_HOST:/var/www/cursos.jesussanchez.me/"
 
           # API: solo el código. `data/` (cuenta, sesiones, cursos) se queda en el
           # VPS, así que --delete no toca lo que tiene la cuenta del usuario.
-          ssh -p "$VPS_PORT" -i ~/.ssh/id_deploy "root@$VPS_HOST" \
+          $SSH "root@$VPS_HOST" \
             "mkdir -p /opt/cursostube/data && chown -R cursostube:cursostube /opt/cursostube"
-          rsync -az --delete --exclude 'data' cursosTube/server/ "root@$VPS_HOST:/opt/cursostube/server/"
+          rsync -az --delete --exclude 'data' -e "$RSYNC_SSH" cursosTube/server/ "root@$VPS_HOST:/opt/cursostube/server/"
 
       - name: Activar la API y recargar nginx
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_PORT: ${{ secrets.VPS_PORT }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-        working-directory: ${{ github.workspace }}
         run: |
-          ssh -p "$VPS_PORT" -i ~/.ssh/id_deploy "root@$VPS_HOST" "chown -R 1000:1000 /var/www/cursos.jesussanchez.me"
-          ssh -p "$VPS_PORT" -i ~/.ssh/id_deploy "root@$VPS_HOST" "chown -R cursostube:cursostube /opt/cursostube/server"
-          ssh -p "$VPS_PORT" -i ~/.ssh/id_deploy "root@$VPS_HOST" \
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$VPS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H -p "$VPS_PORT" "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          SSH="ssh -p $VPS_PORT -i $HOME/.ssh/id_deploy"
+
+          $SSH "root@$VPS_HOST" "chown -R 1000:1000 /var/www/cursos.jesussanchez.me"
+          $SSH "root@$VPS_HOST" "chown -R cursostube:cursostube /opt/cursostube/server"
+          $SSH "root@$VPS_HOST" \
             "cp /opt/cursostube/server/cursostube-api.service /etc/systemd/system/ \
              && systemctl daemon-reload \
              && systemctl enable cursostube-api \
              && systemctl restart cursostube-api \
              && nginx -t && systemctl reload nginx"
-          ssh -p "$VPS_PORT" -i ~/.ssh/id_deploy "root@$VPS_HOST" \
+          $SSH "root@$VPS_HOST" \
             "systemctl is-active cursostube-api && curl -sf http://127.0.0.1:8787/api/health"
